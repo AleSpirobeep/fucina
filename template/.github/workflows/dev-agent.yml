@@ -1,0 +1,131 @@
+name: dev-agent
+
+# Prende in carico una issue etichettata ready-for-dev, la implementa e apre una PR.
+# Configurazione in .fucina.yml.
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Numero della issue da lavorare"
+        type: number
+        required: true
+
+concurrency:
+  group: dev-agent-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: false
+
+jobs:
+  implementa:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'ready-for-dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Leggi la configurazione
+        id: cfg
+        run: |
+          set -euo pipefail
+          command -v yq >/dev/null 2>&1 || {
+            echo "::error::yq non disponibile sul runner"; exit 1; }
+          test -f .fucina.yml || {
+            echo "::error::.fucina.yml assente: esegui prima fucina init"; exit 1; }
+
+          TEST_CMD=$(yq -r '.test_command // ""' .fucina.yml)
+          if [ -z "$TEST_CMD" ] || [ "$TEST_CMD" = "null" ]; then
+            echo "::error::.fucina.yml non definisce test_command. L'agente non ha modo di verificare il proprio lavoro: interrompo."
+            exit 1
+          fi
+
+          {
+            echo "test_command=$TEST_CMD"
+            echo "setup_command=$(yq -r '.setup_command // ""' .fucina.yml)"
+            echo "modello=$(yq -r '.agente.modello // "claude-sonnet-5"' .fucina.yml)"
+            echo "max_turns=$(yq -r '.agente.max_turns // 30' .fucina.yml)"
+            echo "max_budget=$(yq -r '.agente.max_budget_usd // 2' .fucina.yml)"
+            echo "max_iter=$(yq -r '.agente.max_iterazioni // 3' .fucina.yml)"
+            echo "endpoint=$(yq -r '.endpoint // ""' .fucina.yml)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Conta i tentativi precedenti
+        id: tentativi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number || inputs.issue }}
+          MAX: ${{ steps.cfg.outputs.max_iter }}
+        run: |
+          set -euo pipefail
+          N=$(gh issue view "$ISSUE" --json comments \
+                --jq '[.comments[] | select(.body | contains("<!-- fucina:tentativo -->"))] | length')
+          echo "Tentativi già effettuati: $N (massimo $MAX)"
+          echo "n=$N" >> "$GITHUB_OUTPUT"
+
+          if [ "$N" -ge "$MAX" ]; then
+            gh issue edit "$ISSUE" --add-label needs-human --remove-label ready-for-dev
+            gh issue comment "$ISSUE" --body \
+              "L'agente ha esaurito i $MAX tentativi previsti senza chiudere la issue. Serve una persona: probabilmente la issue va riscritta o spezzata."
+            echo "stop=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stop=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Segna il tentativo
+        if: steps.tentativi.outputs.stop == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number || inputs.issue }}
+        run: |
+          gh issue edit "$ISSUE" --add-label in-progress --remove-label ready-for-dev
+          gh issue comment "$ISSUE" --body \
+            "<!-- fucina:tentativo -->Tentativo avviato: [run ${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+      - name: Prepara l'ambiente
+        if: steps.tentativi.outputs.stop == 'false' && steps.cfg.outputs.setup_command != ''
+        run: ${{ steps.cfg.outputs.setup_command }}
+
+      - name: Esegui l'agente
+        if: steps.tentativi.outputs.stop == 'false'
+        uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_BASE_URL: ${{ steps.cfg.outputs.endpoint }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          branch_prefix: "fucina/"
+          track_progress: true
+          prompt: |
+            /dev-agent
+
+            Implementa la issue #${{ github.event.issue.number || inputs.issue }} di
+            questo repository, seguendo alla lettera il ruolo dev-agent.
+
+            Il comando dei test è: ${{ steps.cfg.outputs.test_command }}
+            Eseguilo e assicurati che passi prima di aprire la PR.
+
+            Questo è il tentativo numero ${{ steps.tentativi.outputs.n }} su
+            ${{ steps.cfg.outputs.max_iter }}.
+          claude_args: |
+            --model ${{ steps.cfg.outputs.modello }}
+            --max-turns ${{ steps.cfg.outputs.max_turns }}
+            --max-budget-usd ${{ steps.cfg.outputs.max_budget }}
+
+      - name: Segnala il fallimento del run
+        if: failure() && steps.tentativi.outputs.stop == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number || inputs.issue }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label in-progress
+          gh issue comment "$ISSUE" --body \
+            "Il run dell'agente è terminato con errore — possibile superamento del tetto di spesa o del numero di turni. [Log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
