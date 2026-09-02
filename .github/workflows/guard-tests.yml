@@ -1,0 +1,59 @@
+name: guard-tests
+
+# Impedisce all'agente di modificare i file che lo verificano.
+# Va reso check obbligatorio nelle regole del branch, altrimenti non protegge nulla.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Verifica che yq sia disponibile
+        run: |
+          command -v yq >/dev/null 2>&1 || {
+            echo "::error::yq non disponibile sul runner: impossibile leggere .fucina.yml"
+            exit 1
+          }
+
+      - name: Blocca le modifiche ai percorsi protetti
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+
+          if echo "$LABELS" | grep -q '"allow-test-changes"'; then
+            echo "Label allow-test-changes presente: controllo saltato."
+            exit 0
+          fi
+
+          mapfile -t PERCORSI < <(yq -r '.percorsi_protetti[]' .fucina.yml)
+          if [ ${#PERCORSI[@]} -eq 0 ]; then
+            echo "::error::.fucina.yml non definisce percorsi_protetti"
+            exit 1
+          fi
+
+          echo "Percorsi protetti: ${PERCORSI[*]}"
+          # --diff-filter=MD: intercetta modifiche e cancellazioni, lascia passare
+          # le aggiunte. L'agente deve poter scrivere test nuovi (decisione OP-08),
+          # ma non riscrivere quelli che lo verificano.
+          CAMBIATI=$(git diff --name-only --diff-filter=MD "$BASE" "$HEAD" -- "${PERCORSI[@]}" || true)
+
+          if [ -n "$CAMBIATI" ]; then
+            echo "::error::La PR modifica o cancella percorsi protetti senza la label allow-test-changes:"
+            echo "$CAMBIATI"
+            echo ""
+            echo "Se la modifica è legittima, aggiungi la label allow-test-changes alla PR."
+            echo "Se l'ha fatta l'agente, è il segnale che stavi cercando: leggila prima di approvarla."
+            exit 1
+          fi
+
+          echo "Nessun percorso protetto toccato."

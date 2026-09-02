@@ -1,0 +1,42 @@
+# Configurazione della fucina per questo repo.
+# Letta dai workflow in .github/workflows/. Modificala qui, non nei workflow.
+version: 1
+
+# Comandi del progetto. test_command è obbligatorio (REQ-013).
+setup_command: "pip install -e '.[dev]'"
+test_command: "pytest -q"
+
+agente:
+  modello: "claude-sonnet-5"
+  max_turns: 60
+  max_budget_usd: 3.00
+  max_iterazioni: 3
+
+# Strumenti che l'agente può usare oltre a quelli di sola lettura.
+# ATTENZIONE: senza questa lista l'action concede solo Read/Glob/Grep/LS e
+# l'agente non può modificare file né eseguire i test. Vedi ADR 2026-09-02-0900.
+# Adatta i comandi allo stack del progetto.
+strumenti_permessi:
+  - "Edit"
+  - "Write"
+  - "Bash(pytest:*)"
+  - "Bash(python:*)"
+  - "Bash(python3:*)"
+  - "Bash(pip:*)"
+  - "Bash(git:*)"
+  # gh in sola lettura. Label, commenti di stato e PR sono del workflow:
+  # è deterministico, l'agente no. Mai "Bash(gh:*)": include "gh pr merge".
+  - "Bash(gh issue view:*)"
+  - "Bash(gh pr view:*)"
+
+# Percorsi che l'agente non può modificare senza la label allow-test-changes.
+percorsi_protetti:
+  - "tests/**"
+  - "**/*_test.*"
+  - "**/*.test.*"
+  - ".github/workflows/**"
+
+# Fornitore del modello. Lasciare endpoint vuoto per api.anthropic.com.
+# Vedi debito D-02: cambiare fornitore deve costare due righe, non un rewrite.
+endpoint: ""
+secret_auth: "CLAUDE_CODE_OAUTH_TOKEN"

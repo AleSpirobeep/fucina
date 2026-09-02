@@ -1,0 +1,6 @@
+# Percorsi che richiedono la review di una persona.
+# Le GitHub App non possono comparire qui: solo utenti e team.
+
+/tests/                 @AleSpirobeep
+/.github/workflows/     @AleSpirobeep
+/.fucina.yml            @AleSpirobeep
