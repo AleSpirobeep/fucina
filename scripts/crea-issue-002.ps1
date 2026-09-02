@@ -1,9 +1,28 @@
-# Crea le 12 issue della spec 002 (il Registro) nel repo corrente.
+﻿# Crea le 12 issue della spec 002 (il Registro) nel repo corrente.
 # Da eseguire dentro la cartella del repo fucina, con gh autenticato.
 # Solo T1 riceve ready-for-dev: le altre si etichettano una alla volta,
 # nell'ordine, quando la precedente e' stata fusa.
 
 $ErrorActionPreference = "Stop"
+
+# Titoli delle issue gia' aperte: lo script e' idempotente, non crea doppioni.
+$esistenti = @(gh issue list --state open --limit 200 --json title --jq '.[].title')
+
+function Crea-Issue($titolo, $corpo) {
+  if ($esistenti -contains $titolo) {
+    Write-Host "= $titolo  (esiste gia')"
+    return
+  }
+  # Il corpo passa da un file: le virgolette nel testo spezzerebbero gli argomenti.
+  $tmp = [IO.Path]::GetTempFileName()
+  [IO.File]::WriteAllText($tmp, $corpo, (New-Object Text.UTF8Encoding $false))
+  try {
+    $url = gh issue create --title $titolo --body-file $tmp
+    Write-Host "+ $titolo  ->  $url"
+  } finally {
+    Remove-Item $tmp -ErrorAction SilentlyContinue
+  }
+}
 
 $issues = @(
   @{
@@ -166,8 +185,7 @@ Criteri di accettazione:
 )
 
 foreach ($i in $issues) {
-  $url = gh issue create --title $i.t --body $i.b
-  Write-Host "+ $($i.t)  ->  $url"
+  Crea-Issue $i.t $i.b
 }
 
 Write-Host ""
