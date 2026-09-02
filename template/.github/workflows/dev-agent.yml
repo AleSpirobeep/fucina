@@ -101,7 +101,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ steps.cfg.outputs.endpoint }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT se presente: le PR e le label create col GITHUB_TOKEN di default
+          # non fanno partire i workflow pull_request (stessa trappola del REQ-016).
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           branch_prefix: "fucina/"
@@ -126,7 +128,7 @@ jobs:
       - name: Apri la PR se l'agente non l'ha aperta
         if: success() && steps.tentativi.outputs.stop == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
           ISSUE: ${{ github.event.issue.number || inputs.issue }}
           BASE: ${{ github.ref_name }}
         run: |

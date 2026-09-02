@@ -92,7 +92,7 @@ fi
 # --- passi manuali -----------------------------------------------------------
 
 cat <<FINE
-$(giallo "Restano tre cose che init non può fare al posto tuo:")
+$(giallo "Restano quattro cose che init non può fare al posto tuo:")
 
   1. Installa la GitHub App di Claude su questo repo:
      https://github.com/apps/claude
@@ -104,12 +104,17 @@ $(giallo "Restano tre cose che init non può fare al posto tuo:")
      gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo $REPO
      Non incollare mai il token altrove.
 
-  3. Proteggi il branch main:
-     Settings > Branches > Add rule su 'main'
-       - Require a pull request before merging
-       - Require status checks to pass: ci, guard-tests
-       - Require review from Code Owners
-     Non abilitare l'auto-merge e non inserire agenti nella lista di bypass.
+  3. Crea un token personale (fine-grained) limitato a questo repo, con
+     Contents / Issues / Pull requests in lettura e scrittura, e salvalo:
+     gh secret set FUCINA_PAT --repo $REPO
+     Serve perché le PR aperte col GITHUB_TOKEN non fanno partire i check.
+
+  4. Proteggi il branch main. Richiede repo pubblico o piano Pro:
+       gh api -X PUT repos/$REPO/branches/main/protection --input protection.json
+     con required_status_checks su "test" e "guard", una approvazione
+     obbligatoria, enforce_admins false. Nessun auto-merge, nessun bypass
+     per gli agenti. (Il CODEOWNERS è già scritto: si attiva da solo dove
+     il piano lo consente, ma con una sola persona è comunque ridondante.)
 
 $(verde "Poi controlla la configurazione in .fucina.yml: test_command è obbligatorio.")
 FINE
