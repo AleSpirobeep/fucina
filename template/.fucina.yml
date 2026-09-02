@@ -8,9 +8,23 @@ test_command: "pytest -q"
 
 agente:
   modello: "claude-sonnet-5"
-  max_turns: 30
-  max_budget_usd: 2.00
+  max_turns: 60
+  max_budget_usd: 3.00
   max_iterazioni: 3
+
+# Strumenti che l'agente può usare oltre a quelli di sola lettura.
+# ATTENZIONE: senza questa lista l'action concede solo Read/Glob/Grep/LS e
+# l'agente non può modificare file né eseguire i test. Vedi ADR 2026-09-02-0900.
+# Adatta i comandi allo stack del progetto.
+strumenti_permessi:
+  - "Edit"
+  - "Write"
+  - "Bash(pytest:*)"
+  - "Bash(python:*)"
+  - "Bash(python3:*)"
+  - "Bash(pip:*)"
+  - "Bash(git:*)"
+  - "Bash(gh:*)"
 
 # Percorsi che l'agente non può modificare senza la label allow-test-changes.
 percorsi_protetti:
