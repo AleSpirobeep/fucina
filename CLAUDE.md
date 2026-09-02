@@ -1,29 +1,33 @@
-# Convenzioni del progetto
+# Convenzioni — repo fucina
 
-> File letto da ogni agente a ogni esecuzione. Tienilo corto: quello che scrivi qui
-> viene pagato in token a ogni run. Se cresce oltre una pagina, sposta i dettagli in
-> `docs/` e lascia qui solo i puntatori.
+> Letto da ogni agente a ogni esecuzione. Corto per scelta.
+
+## Cosa c'è qui
+
+- `ui/` — il Registro (spec 002): una pagina statica che interroga l'API di GitHub.
+  `index.html` è la pagina, `lib.js` la logica pura, `lib.test.js` i suoi test.
+- `specs/` — cosa deve fare ogni cosa. La spec attiva è `specs/002-registro/spec.md`.
+- `docs/decisions/` — perché è fatto così. Non contraddire un ADR accettato.
+- `template/`, `plugin/`, `init.sh` — la fucina stessa. **Non toccarli** se l'issue non li
+  nomina: sono ciò che fa girare l'agente che sta leggendo queste righe.
 
 ## Comandi
 
-- Installazione dipendenze: vedi `setup_command` in `.fucina.yml`
-- Test: vedi `test_command` in `.fucina.yml`
+- Test: `node --test ui/` — nessuna dipendenza, nessun `npm install`.
 
-## Dove sta la verità
+## Regole per `ui/`
 
-- `specs/` — cosa il progetto deve fare
-- `docs/decisions/` — perché è fatto così. **Non contraddire un ADR accettato:**
-  se una decisione va cambiata, si scrive un ADR nuovo con `status: superseded by ...`
-- `.fucina.yml` — configurazione degli agenti
+- Nessun passo di build, nessun `package.json`, nessuna libreria esterna. Solo API di
+  GitHub.
+- La logica che si può testare senza browser va in `lib.js`, come funzioni pure
+  esportate; `index.html` la importa come modulo ES e fa solo rendering e chiamate.
+- Ogni funzione in `lib.js` ha almeno un test in `lib.test.js`, con il runner di Node
+  (`node:test` e `node:assert`).
+- Il token dell'utente esiste solo in `localStorage`. Mai in un file, mai in un log.
+- Italiano nell'interfaccia e nei messaggi d'errore.
 
 ## Definizione di "fatto"
 
-Un lavoro è finito quando: i test passano, i criteri di accettazione dell'issue sono
-tutti soddisfatti, le decisioni non coperte dalla specifica sono in un ADR, e la PR
-dichiara esplicitamente cosa non è stato fatto.
-
-## Convenzioni
-
-- Branch: `fucina/<numero-issue>`
-- Commit in italiano, all'imperativo, che dicono cosa cambia e perché
-- Nessuna dipendenza nuova senza un ADR che la motivi
+Test verdi, criteri di accettazione della issue soddisfatti uno per uno, decisioni non
+coperte dalla spec in un ADR, `.fucina/pr-body.md` con le sezioni "Non fatto" e "Fatto
+in più" compilate.
