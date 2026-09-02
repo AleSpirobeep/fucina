@@ -111,10 +111,10 @@ $(giallo "Restano quattro cose che init non può fare al posto tuo:")
 
   4. Proteggi il branch main. Richiede repo pubblico o piano Pro:
        gh api -X PUT repos/$REPO/branches/main/protection --input protection.json
-     con required_status_checks su "test" e "guard", una approvazione
-     obbligatoria, enforce_admins false. Nessun auto-merge, nessun bypass
-     per gli agenti. (Il CODEOWNERS è già scritto: si attiva da solo dove
-     il piano lo consente, ma con una sola persona è comunque ridondante.)
+     con required_status_checks su "test" e "guard", PR obbligatoria con
+     zero approvazioni richieste (le PR aperte col tuo PAT risultano tue,
+     e non puoi approvare le tue PR: il cancello è il merge manuale),
+     enforce_admins false. Nessun auto-merge, nessun bypass per gli agenti.
 
 $(verde "Poi controlla la configurazione in .fucina.yml: test_command è obbligatorio.")
 FINE

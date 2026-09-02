@@ -1,6 +1,6 @@
 # Spec 001 — Loop dello sviluppatore
 
-Stato: **bozza in attesa di chiarimenti** · Data: 30 agosto 2026 · Versione: v1
+Stato: **v1 collaudata, con riserve dichiarate in fondo** · Aggiornata: 2 settembre 2026
 
 ## Obiettivo
 
@@ -56,8 +56,9 @@ La fucina non sostituisce Spec Kit: presuppone che il repo target lo usi o possa
 
 ### Agente sviluppatore
 
-- **REQ-010** — applicando `ready-for-dev` a una issue parte un workflow che crea il branch
-  `fucina/<numero-issue>` e apre una PR che chiude quella issue.
+- **REQ-010** — applicando `ready-for-dev` a una issue parte un workflow che crea un branch
+  con prefisso `fucina/` (il nome completo lo decide l'action: `fucina/issue-<N>-<data>`) e,
+  a lavoro concluso, apre una PR che chiude quella issue.
   *Verifica:* su una issue di prova, entro 10 minuti esistono branch e PR collegata.
 
 - **REQ-011** — a lavoro concluso il workflow applica `needs-review` alla PR e rimuove
@@ -100,8 +101,14 @@ La fucina non sostituisce Spec Kit: presuppone che il repo target lo usi o possa
 - **REQ-022** — `guard-tests` si rivaluta all'aggiunta e alla rimozione di una label.
   *Verifica:* PR rossa che riceve `allow-test-changes` → il check ridiventa verde senza nuovo push.
 
-- **REQ-023** — `CODEOWNERS` richiede la review di Alessio sui percorsi protetti.
-  *Verifica:* PR che li tocca → review richiesta automaticamente.
+- **REQ-023** — il branch principale è protetto: PR obbligatoria, check `test` e `guard`
+  obbligatori, nessun bypass per gli agenti. Il merge resta manuale (P4).
+  *Verifica:* un push diretto su `main` da un attore non amministratore viene respinto; una
+  PR con un check rosso non è fondibile.
+  *Nota:* la protezione richiede repo pubblico o piano Pro. Il `CODEOWNERS` resta nel
+  template ma con una sola persona è ridondante e sul piano Free non è applicabile. Le
+  approvazioni richieste sono zero: le PR aperte tramite il PAT risultano di Alessio, che
+  non può approvare le proprie.
 
 - **REQ-024** — la fucina non abilita mai l'auto-merge e non inserisce agenti in liste di bypass.
   *Verifica:* ispezione della configurazione generata.
@@ -112,9 +119,11 @@ La fucina non sostituisce Spec Kit: presuppone che il repo target lo usi o possa
   un ADR in `docs/decisions/` con identificativo basato su data-ora e `status: accepted`.
   *Verifica:* issue volutamente ambigua → la PR contiene un nuovo ADR.
 
-- **REQ-031** — se l'agente non può decidere, non indovina: applica `needs-human` all'issue,
-  commenta il motivo in una frase e termina senza aprire PR.
-  *Verifica:* issue con requisito contraddittorio → label applicata, nessuna PR.
+- **REQ-031** — se l'agente non può decidere, non indovina: formula nel suo report una
+  domanda chiusa con le opzioni e termina senza creare branch. Il workflow, vedendo un run
+  verde senza branch, applica `needs-human` e spiega come riprendere.
+  *Verifica:* issue con scelta non coperta dalla specifica → label applicata, nessuna PR,
+  domanda leggibile nel commento.
 
 - **REQ-032** — dopo tre run falliti sulla stessa issue l'automatismo si ferma e applica
   `needs-human`.
@@ -171,3 +180,20 @@ La v2 deve poter cambiare fornitore cambiando due variabili, non riscrivendo i w
 `.fucina/pr-body.md` finisce nel diff e in `main` a ogni merge. Alternativa da valutare:
 leggere il report dall'ultimo commento dell'action sull'issue (formato non garantito),
 oppure un commit di pulizia post-merge. Vedi ADR 2026-09-02-1700.
+
+---
+
+## Stato di verifica — 2 settembre 2026
+
+Sei run dell'agente, tre PR prodotte, due fuse, una PR di prova a mano.
+
+| Esito | Requisiti |
+|---|---|
+| Verificati sul campo | 001 · 002 · 003 · 004 · 005 · 010 · 011 · 012 · 013 · 016 · 017 · 020 · 021 · 022 · 024 · 030 · 032 |
+| Verificati per costruzione | 023 (protezione attiva; il bypass da amministratore è stato visto nei push di Alessio) |
+| Verificati con riserva | 031 — l'agente si è fermato correttamente, ma il README del laboratorio annunciava lo scopo del test e l'agente l'ha letto. Da ricollaudare con una issue ambigua non annunciata. |
+| Da confermare | 015 — i due run concorrenti hanno prodotto il risultato atteso, ma i timestamp a livello di run non distinguono "creato" da "eseguito"; serve il timestamp del job. |
+| **Non verificati** | **014** — la prova del budget è fallita per un bug non correlato (`track_progress` su `workflow_dispatch`, corretto). Da rifare con budget minimo su un trigger da label. |
+
+Fino alla verifica del REQ-014, l'unico tetto di spesa di cui abbiamo evidenza è
+`max_turns`. Va considerato il tetto effettivo.

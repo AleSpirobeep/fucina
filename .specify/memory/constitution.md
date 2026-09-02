@@ -34,3 +34,10 @@ Budget di spesa e numero massimo di iterazioni sono espliciti e configurati, mai
 ## P8 — L'installazione è idempotente e non distruttiva
 `init` si può rilanciare su un repo già inizializzato senza duplicare nulla e senza
 sovrascrivere file personalizzati.
+
+## P9 — Ciò che è deterministico lo fa il workflow
+Label, commenti di stato, apertura della PR, conteggio dei tentativi: tutto ciò che
+si può decidere da fatti osservabili lo decide il workflow, non l'agente. All'agente
+restano le azioni che richiedono giudizio: leggere, capire, scrivere codice e test,
+decidere quando fermarsi. Tre cicli su tre hanno mostrato che un'azione di stato
+affidata all'agente può non avvenire, in silenzio.
