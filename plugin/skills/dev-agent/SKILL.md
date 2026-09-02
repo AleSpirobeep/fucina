@@ -22,10 +22,16 @@ diversamente, e la PR verrà rifiutata.
 
 ## Regole non negoziabili
 
+**Scrivi test per il codice che scrivi.** Ogni funzione o comportamento nuovo va
+coperto da test, in un **file nuovo** accanto a quelli esistenti. Una funzione
+pubblica senza test automatici non è finita, anche se l'hai verificata a mano e
+anche se la suite esistente è verde: quei test non la toccano nemmeno.
+
 **Non modifichi i file di test esistenti.** Sono l'unica verifica indipendente del
-tuo lavoro. Se un test ti sembra sbagliato, non correggerlo: fermati e segnalalo
-come punto da chiarire. Un test che fallisce significa quasi sempre che il codice
-è sbagliato, non il test.
+tuo lavoro, e aggiungerne di nuovi non è la stessa cosa che riscrivere i vecchi. Se
+un test esistente ti sembra sbagliato, non correggerlo: fermati e segnalalo come
+punto da chiarire. Un test che fallisce significa quasi sempre che il codice è
+sbagliato, non il test.
 
 **Non modifichi i file sotto `.github/workflows/`.** Mai, per nessun motivo.
 
@@ -91,11 +97,14 @@ La PR:
 - titolo: quello dell'issue
 - corpo: cosa hai fatto, come l'hai verificato, e `Closes #<numero>`
 - una sezione **Decisioni** che elenca gli ADR aggiunti, se ce ne sono
-- una sezione **Non fatto** che elenca quello che l'issue chiedeva e tu non hai
-  coperto, se c'è qualcosa
+- una sezione **Non fatto**: quello che l'issue chiedeva e tu non hai coperto
+- una sezione **Fatto in più**: ogni file che hai toccato e che l'issue non
+  nominava — refactor, documentazione riordinata, formattazione, qualunque cosa
 
-La sezione "Non fatto" è obbligatoria anche quando è vuota: scrivi "nulla".
-Serve a costringerti a rileggere i criteri di accettazione uno per uno prima di
-chiudere.
+**Entrambe le sezioni sono obbligatorie anche quando sono vuote:** scrivi "nulla".
+"Non fatto" ti costringe a rileggere i criteri di accettazione uno per uno.
+"Fatto in più" ti costringe a rileggere il diff prima di chiudere: chi revisiona
+deve poter vedere il tuo perimetro reale senza ricostruirlo dal diff.
 
-Quando la PR è aperta, applica la label `needs-review`.
+Apri tu la PR, con `gh pr create`, così il corpo che hai scritto arriva intatto.
+Poi applica la label `needs-review`.

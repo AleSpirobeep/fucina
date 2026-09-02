@@ -101,6 +101,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ steps.cfg.outputs.endpoint }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           branch_prefix: "fucina/"
@@ -121,6 +122,37 @@ jobs:
             --max-turns ${{ steps.cfg.outputs.max_turns }}
             --max-budget-usd ${{ steps.cfg.outputs.max_budget }}
             --allowedTools ${{ steps.cfg.outputs.strumenti }}
+
+      - name: Apri la PR se l'agente non l'ha aperta
+        if: success() && steps.tentativi.outputs.stop == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number || inputs.issue }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git fetch origin --prune
+
+          BRANCH=$(git ls-remote --heads origin "fucina/issue-${ISSUE}-*" \
+                   | sed 's|.*refs/heads/||' | sort | tail -1)
+          if [ -z "$BRANCH" ]; then
+            echo "L'agente non ha prodotto alcun branch: niente PR da aprire."
+            exit 0
+          fi
+
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')" ]; then
+            echo "PR già aperta dall'agente su $BRANCH: niente da fare."
+          else
+            echo "L'agente non ha aperto la PR: la apro io con un corpo minimo."
+            TITOLO=$(gh issue view "$ISSUE" --json title -q .title)
+            gh pr create --base "$BASE" --head "$BRANCH" --title "$TITOLO" \
+              --body "PR aperta automaticamente dal workflow: l'agente non l'ha aperta da sé, quindi manca il corpo che avrebbe dovuto scrivere. Leggi il diff per intero prima di approvare.
+
+          Closes #${ISSUE}"
+          fi
+
+          gh pr edit "$BRANCH" --add-label needs-review || true
+          gh issue edit "$ISSUE" --remove-label in-progress || true
 
       - name: Segnala il fallimento del run
         if: failure() && steps.tentativi.outputs.stop == 'false'

@@ -24,7 +24,14 @@ strumenti_permessi:
   - "Bash(python3:*)"
   - "Bash(pip:*)"
   - "Bash(git:*)"
-  - "Bash(gh:*)"
+  # gh ristretto ai soli comandi che servono: mai "Bash(gh:*)", che
+  # includerebbe "gh pr merge" e violerebbe il principio P4.
+  - "Bash(gh issue view:*)"
+  - "Bash(gh issue edit:*)"
+  - "Bash(gh issue comment:*)"
+  - "Bash(gh pr view:*)"
+  - "Bash(gh pr create:*)"
+  - "Bash(gh pr edit:*)"
 
 # Percorsi che l'agente non può modificare senza la label allow-test-changes.
 percorsi_protetti:

@@ -42,10 +42,13 @@ jobs:
           fi
 
           echo "Percorsi protetti: ${PERCORSI[*]}"
-          CAMBIATI=$(git diff --name-only "$BASE" "$HEAD" -- "${PERCORSI[@]}" || true)
+          # --diff-filter=MD: intercetta modifiche e cancellazioni, lascia passare
+          # le aggiunte. L'agente deve poter scrivere test nuovi (decisione OP-08),
+          # ma non riscrivere quelli che lo verificano.
+          CAMBIATI=$(git diff --name-only --diff-filter=MD "$BASE" "$HEAD" -- "${PERCORSI[@]}" || true)
 
           if [ -n "$CAMBIATI" ]; then
-            echo "::error::La PR modifica percorsi protetti senza la label allow-test-changes:"
+            echo "::error::La PR modifica o cancella percorsi protetti senza la label allow-test-changes:"
             echo "$CAMBIATI"
             echo ""
             echo "Se la modifica è legittima, aggiungi la label allow-test-changes alla PR."
