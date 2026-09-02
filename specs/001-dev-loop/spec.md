@@ -166,3 +166,8 @@ La fatturazione dell'uso di Claude Code in GitHub Actions a carico della sottosc
 è oggi possibile per una decisione sospesa, non ritirata (vedi ADR 2026-08-30-1050).
 La v2 deve poter cambiare fornitore cambiando due variabili, non riscrivendo i workflow:
 `ANTHROPIC_BASE_URL` e il secret di autenticazione vanno tenuti in `.fucina.yml`.
+
+**D-03 — Il corpo della PR viaggia in un file committato.**
+`.fucina/pr-body.md` finisce nel diff e in `main` a ogni merge. Alternativa da valutare:
+leggere il report dall'ultimo commento dell'action sull'issue (formato non garantito),
+oppure un commit di pulizia post-merge. Vedi ADR 2026-09-02-1700.

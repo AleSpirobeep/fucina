@@ -30,8 +30,6 @@ strumenti_permessi:
   - "Bash(gh issue edit:*)"
   - "Bash(gh issue comment:*)"
   - "Bash(gh pr view:*)"
-  - "Bash(gh pr create:*)"
-  - "Bash(gh pr edit:*)"
 
 # Percorsi che l'agente non può modificare senza la label allow-test-changes.
 percorsi_protetti:

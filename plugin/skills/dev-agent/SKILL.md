@@ -93,8 +93,8 @@ Branch: `fucina/<numero-issue>`.
 Commit piccoli, messaggio in italiano all'imperativo, che dice cosa cambia e
 perché — non "fix" o "update".
 
-La PR:
-- titolo: quello dell'issue
+Il corpo della PR (in `.fucina/pr-body.md`):
+- titolo: non serve, lo mette il workflow dall'issue
 - corpo: cosa hai fatto, come l'hai verificato, e `Closes #<numero>`
 - una sezione **Decisioni** che elenca gli ADR aggiunti, se ce ne sono
 - una sezione **Non fatto**: quello che l'issue chiedeva e tu non hai coperto
@@ -106,5 +106,9 @@ La PR:
 "Fatto in più" ti costringe a rileggere il diff prima di chiudere: chi revisiona
 deve poter vedere il tuo perimetro reale senza ricostruirlo dal diff.
 
-Apri tu la PR, con `gh pr create`, così il corpo che hai scritto arriva intatto.
-Poi applica la label `needs-review`.
+**Non aprire tu la PR: la apre il workflow** dopo che hai finito. Il tuo ultimo
+atto è scrivere il corpo della PR nel file `.fucina/pr-body.md` — le sezioni
+sopra, in quest'ordine, in markdown — e committarlo nel branch insieme al resto.
+Il workflow lo leggerà dal branch e lo userà come corpo. Se il file manca, la PR
+verrà aperta con un corpo che dichiara che il tuo manca: è peggio di qualunque
+cosa avresti potuto scrivere.

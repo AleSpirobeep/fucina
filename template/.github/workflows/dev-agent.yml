@@ -125,7 +125,7 @@ jobs:
             --max-budget-usd ${{ steps.cfg.outputs.max_budget }}
             --allowedTools ${{ steps.cfg.outputs.strumenti }}
 
-      - name: Apri la PR se l'agente non l'ha aperta
+      - name: Apri la PR con il corpo scritto dall'agente
         if: success() && steps.tentativi.outputs.stop == 'false'
         env:
           GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
@@ -143,16 +143,31 @@ jobs:
           fi
 
           if [ -n "$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')" ]; then
-            echo "PR già aperta dall'agente su $BRANCH: niente da fare."
-          else
-            echo "L'agente non ha aperto la PR: la apro io con un corpo minimo."
-            TITOLO=$(gh issue view "$ISSUE" --json title -q .title)
-            gh pr create --base "$BASE" --head "$BRANCH" --title "$TITOLO" \
-              --body "PR aperta automaticamente dal workflow: l'agente non l'ha aperta da sé, quindi manca il corpo che avrebbe dovuto scrivere. Leggi il diff per intero prima di approvare.
-
-          Closes #${ISSUE}"
+            echo "PR già aperta su $BRANCH: niente da fare."
+            exit 0
           fi
 
+          TITOLO=$(gh issue view "$ISSUE" --json title -q .title)
+
+          # Il corpo lo scrive l'agente in .fucina/pr-body.md sul branch.
+          # L'action vieta all'agente di aprire PR da sé (è nel suo prompt di
+          # sistema), quindi la apriamo qui con il testo che ha preparato.
+          if git show "origin/$BRANCH:.fucina/pr-body.md" > /tmp/pr-body.md 2>/dev/null \
+             && [ -s /tmp/pr-body.md ]; then
+            printf '\n\nCloses #%s\n' "$ISSUE" >> /tmp/pr-body.md
+            echo "Corpo della PR letto dal branch."
+          else
+            cat > /tmp/pr-body.md <<FINE
+          **Corpo mancante.** L'agente non ha scritto \`.fucina/pr-body.md\`, quindi
+          questa PR non ha le sezioni "Non fatto" e "Fatto in più". Leggi il diff per
+          intero prima di approvare, e considera il ruolo da correggere.
+
+          Closes #${ISSUE}
+          FINE
+            echo "::warning::.fucina/pr-body.md assente sul branch: PR aperta con corpo minimo."
+          fi
+
+          gh pr create --base "$BASE" --head "$BRANCH" --title "$TITOLO" --body-file /tmp/pr-body.md
           gh pr edit "$BRANCH" --add-label needs-review || true
           gh issue edit "$ISSUE" --remove-label in-progress || true
 
