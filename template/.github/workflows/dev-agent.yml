@@ -138,7 +138,12 @@ jobs:
           BRANCH=$(git ls-remote --heads origin "fucina/issue-${ISSUE}-*" \
                    | sed 's|.*refs/heads/||' | sort | tail -1)
           if [ -z "$BRANCH" ]; then
-            echo "L'agente non ha prodotto alcun branch: niente PR da aprire."
+            # Run verde senza branch: l'agente si è fermato a chiedere (REQ-031).
+            # La label la mette il workflow, non l'agente: è stato deterministico.
+            echo "Nessun branch prodotto: l'agente si è fermato. Applico needs-human."
+            gh issue edit "$ISSUE" --add-label needs-human --remove-label in-progress
+            gh issue comment "$ISSUE" --body \
+              "L'agente si è fermato senza produrre codice: la sua domanda è nel commento qui sopra. Rispondi in un commento, poi togli \`needs-human\` e rimetti \`ready-for-dev\` per farlo ripartire."
             exit 0
           fi
 

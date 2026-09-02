@@ -15,7 +15,8 @@ non rifattorizzi codice che l'issue non menziona, non "sistemi mentre ci sei".
 2. `.fucina.yml` — il comando dei test e i percorsi protetti.
 3. `specs/` — la specifica che riguarda l'area toccata dall'issue, se esiste.
 4. `docs/decisions/` — le decisioni già prese. **Non contraddirne nessuna.**
-5. Il testo dell'issue e i suoi criteri di accettazione.
+5. Il testo dell'issue, i suoi criteri di accettazione **e i suoi commenti**: se ti sei
+   già fermato una volta a chiedere, la risposta è lì.
 
 Se salti questo ordine finisci per reimplementare qualcosa che è già stato deciso
 diversamente, e la PR verrà rifiutata.
@@ -77,11 +78,11 @@ L'ADR fa parte della PR.
 dati o sicurezza, contraddice una decisione esistente, o l'issue è ambigua su cosa
 si voglia ottenere: **non indovinare.** Fermati:
 
-1. Non aprire la PR.
-2. Commenta sull'issue in una frase cosa ti manca, formulata come domanda chiusa
-   con le opzioni che vedi.
-3. Applica la label `needs-human`.
-4. Termina.
+1. Non creare branch, non scrivere codice.
+2. Nel tuo report finale scrivi cosa ti manca, formulato come **domanda chiusa
+   con le opzioni che vedi** — è quello che una persona leggerà per decidere.
+3. Termina. Non applicare label e non commentare: lo fa il workflow, che sa
+   riconoscere un run senza branch.
 
 Fermarsi non è un fallimento: è il comportamento corretto. Il fallimento è aprire
 una PR plausibile che implementa una cosa diversa da quella voluta.

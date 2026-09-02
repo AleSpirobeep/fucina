@@ -24,11 +24,9 @@ strumenti_permessi:
   - "Bash(python3:*)"
   - "Bash(pip:*)"
   - "Bash(git:*)"
-  # gh ristretto ai soli comandi che servono: mai "Bash(gh:*)", che
-  # includerebbe "gh pr merge" e violerebbe il principio P4.
+  # gh in sola lettura. Label, commenti di stato e PR sono del workflow:
+  # è deterministico, l'agente no. Mai "Bash(gh:*)": include "gh pr merge".
   - "Bash(gh issue view:*)"
-  - "Bash(gh issue edit:*)"
-  - "Bash(gh issue comment:*)"
   - "Bash(gh pr view:*)"
 
 # Percorsi che l'agente non può modificare senza la label allow-test-changes.
