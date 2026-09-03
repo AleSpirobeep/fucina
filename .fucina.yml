@@ -3,7 +3,7 @@
 version: 1
 
 setup_command: ""
-test_command: "node --test ui/"
+test_command: 'node --test "ui/**/*.test.js"'
 
 agente:
   modello: "claude-sonnet-5"
