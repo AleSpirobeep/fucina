@@ -1,59 +1,73 @@
-Implementa T10 (REQ-130, REQ-131, REQ-132): su ogni issue `needs-human` della sezione
-"Aspettano te" un campo di testo e un pulsante "Rispondi e riavvia" che, dopo conferma,
-pubblica il commento, toglie `needs-human` e mette `ready-for-dev`, fermandosi al primo
-errore.
+Applica alla dashboard del Registro l'identità visiva della fucina (T11): palette a
+neutri freddi verde-grigi con tema chiaro/scuro secondo `prefers-color-scheme`,
+accento petrolio per gli elementi automatici, accento ambra per "Aspettano te" e per
+il pulsante "Rispondi e riavvia", tipografia Archivo/Newsreader/JetBrains Mono,
+impaginazione per schermi da 1200 px in su.
 
-## Cosa cambia
+## Cosa ho fatto
 
-- `ui/lib.js`: nuove funzioni pure
-  - `urlLabelIssue` / `urlRimuoviLabelIssue` — URL per aggiungere e togliere
-    un'etichetta di una issue.
-  - `testoRispostaValido` — vero solo se il campo non è vuoto o di soli spazi;
-    guida il disabilitato del pulsante.
-  - `messaggioConfermaRisposta` — testo della finestra di conferma: titolo, numero
-    della issue e il commento che sta per essere pubblicato.
-  - `FASE_COMMENTO` / `FASE_RIMUOVI_NEEDS_HUMAN` / `FASE_AGGIUNGI_READY_FOR_DEV` e
-    `messaggioErroreFase` — dicono quale delle tre chiamate è fallita.
-- `ui/github.js`:
-  - `richiesta` ora accetta un metodo HTTP e un corpo, e gestisce le risposte `204`
-    (le DELETE sulle etichette non hanno corpo JSON).
-  - `pubblicaCommento`, `rimuoviLabel`, `aggiungiLabel` — le tre chiamate singole.
-  - `rispondiERiavvia` — le esegue in ordine (commento, poi rimozione di
-    `needs-human`, poi aggiunta di `ready-for-dev`) e si ferma al primo errore,
-    rilanciandolo come `ErroreFase` con la fase e la causa originale.
-- `ui/index.html`: ogni issue bloccata in "Aspettano te" ha ora una `textarea`, un
-  pulsante disabilitato finché il campo è vuoto, e un `window.confirm()` con il testo
-  di `messaggioConfermaRisposta` prima di chiamare `rispondiERiavvia`. In caso di
-  errore mostra `messaggioErroreFase` sotto il campo; in caso di successo svuota il
-  campo e rilancia un aggiornamento completo della dashboard.
+Tutto in `ui/index.html` (blocco `<style>`, `<link>` ai font, e due piccoli tocchi di
+markup), senza toccare `lib.js`, `github.js` o la logica dello script:
+
+- **Palette**: variabili CSS per neutri freddi verde-grigi, ridefinite sotto
+  `@media (prefers-color-scheme: dark)`. Accento petrolio (`--colore-accento`) su
+  link, pulsanti e intestazioni di tabella. Accento ambra riservato a `#aspettanoTe`
+  (sfondo, bordo sinistro spesso, testo) e al pulsante "Rispondi e riavvia"
+  (`.rispondi-form button`).
+- **Tipografia**: Archivo per i titoli, Newsreader per il testo, JetBrains Mono per
+  tabelle/etichette/orari, caricati da un unico foglio di stile su
+  `fonts.googleapis.com`, con fallback di sistema dichiarati in ogni variabile
+  `--font-*`. Motivazione dell'interpretazione del vincolo sui font (i file binari
+  arrivano comunque da `fonts.gstatic.com`, inevitabile per chiunque usi Google
+  Fonts) in
+  [`docs/decisions/2026-09-03-1541-font-da-google-fonts.md`](../docs/decisions/2026-09-03-1541-font-da-google-fonts.md).
+- **Impaginazione**: `body` con `min-width: 1200px` e `max-width: 1400px`; "Avanzamento"
+  e "Agenti attivi" in un contenitore `.griglia-secondaria` (`grid-template-columns:
+  minmax(0, 2fr) minmax(0, 1fr)`) sotto "Aspettano te" a piena larghezza; tabelle con
+  `table-layout: fixed`.
+- **Correzione dello scroll orizzontale con token lunghi senza spazi** (richiesta del
+  PM dopo la revisione della PR #41, chiusa): i figli diretti di `.griglia-secondaria`
+  hanno `min-width: 0` e le tracce della griglia sono `minmax(0, …)`, così non possono
+  più superare la loro colonna; `overflow-wrap: anywhere` su `body` (proprietà
+  ereditata) fa andare a capo qualunque token senza spazi in liste, paragrafi, celle
+  di tabella e link generati dallo script — a differenza di `overflow-wrap:
+  break-word`, `anywhere` riduce anche la dimensione minima automatica usata da
+  griglia/tabelle nel calcolo del layout, che è la causa dello scroll segnalato.
 
 ## Come l'ho verificato
 
-- `node --test "ui/**/*.test.js"` — 113 test, tutti verdi (21 nuovi in
-  `ui/rispondi-e-riavvia.test.js`, incluso l'ordine delle tre chiamate, l'arresto alla
-  prima chiamata fallita con token senza permesso di scrittura, e il fatto che un
-  fallimento sulla rimozione dell'etichetta non arrivi mai ad aggiungere
-  `ready-for-dev`).
-- La conferma nativa del browser e il disabilitato del pulsante sono wiring DOM in
-  `index.html`, non testabile senza browser: verificati a lettura di codice, con lo
-  stesso schema già in uso per T6/T7/T8/T9.
+- `node --test "ui/**/*.test.js"` → 113/113 verdi (nessun test nuovo: task solo
+  CSS/markup, nessuna funzione pura nuova in `lib.js`).
+- Verifica visiva in Chromium headless (via CDP, `Emulation.setDeviceMetricsOverride`
+  1280×900 e `Emulation.setEmulatedMedia` per i due temi) su una pagina di prova che
+  riproduce il markup reale con contenuto realistico e con un token di 100 caratteri
+  senza spazi (tipo nome di branch) inserito in ogni punto indicato dal PM: banner
+  d'errore, titolo e commento di una issue `needs-human` in "Aspettano te", sezioni
+  "Non fatto"/"Fatto in più" di una PR `needs-review`, ogni cella della tabella di
+  "Avanzamento" (sei colonne), titolo di un run `dev-agent` in "Agenti attivi". In
+  entrambi i temi `document.documentElement.scrollWidth` coincide con `clientWidth`
+  (1280 = 1280): nessuno scroll orizzontale. Controllate anche a schermo le
+  screenshot dei due temi: "Aspettano te" resta chiaramente distinta in ambra, il
+  contrasto testo/sfondo del pulsante "Rispondi e riavvia" è leggibile in entrambi.
 
-Closes #22
+Closes #23
 
 ## Decisioni
 
-- [2026-09-03-1425-conferma-nativa-rispondi-e-riavvia.md](../docs/decisions/2026-09-03-1425-conferma-nativa-rispondi-e-riavvia.md):
-  uso `window.confirm()` invece di un modale custom per la conferma di REQ-132, in
-  attesa dell'identità visiva di T11.
+- [2026-09-03-1541-font-da-google-fonts.md](../docs/decisions/2026-09-03-1541-font-da-google-fonts.md):
+  il vincolo "solo `fonts.googleapis.com`" si applica al dominio dichiarato dalla
+  pagina (il `<link>` del foglio di stile); `fonts.gstatic.com`, da cui Google serve
+  i file dei font, non è un dominio scelto dalla pagina ma un dettaglio implementativo
+  inevitabile di Google Fonts.
 
 ## Non fatto
 
-Nulla dei criteri di accettazione della issue: il commento va sempre per primo (REQ-131),
-un fallimento su una qualunque delle tre chiamate ferma la sequenza e lo dice, annullare
-la conferma non fa partire nessuna chiamata, e il pulsante resta disabilitato a campo vuoto.
+Nulla dei criteri di accettazione della issue, incluso quello aggiunto dal PM dopo la
+revisione della PR #41: a 1280 px nulla scorre orizzontalmente anche con titoli,
+commenti e URL senza spazi lunghi 100 caratteri, in ogni sezione (verificato sopra).
 
 ## Fatto in più
 
-Ho generalizzato la funzione privata `richiesta` in `ui/github.js` per accettare metodo e
-corpo (prima faceva solo `GET`): necessario per le tre nuove chiamate, ma tocca codice
-scritto per T5/T6.
+Ho aggiunto la classe `rispondi-form` al contenitore del modulo "Rispondi e riavvia"
+in `costruisciFormRispondiERiavvia` (`ui/index.html`), per poterlo selezionare in CSS
+senza toccare `lib.js`: presentazione, non logica.
