@@ -1,9 +1,10 @@
 # Configurazione della fucina per il repo della fucina stessa.
-# La fucina costruisce la propria interfaccia (spec 002) con questo loop.
+# La fucina costruisce la propria interfaccia (spec 002) e il proprio PM (spec 003)
+# con questo loop.
 version: 1
 
 setup_command: ""
-test_command: 'node --test "ui/**/*.test.js"'
+test_command: 'node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"'
 
 agente:
   modello: "claude-sonnet-5"
@@ -15,12 +16,14 @@ strumenti_permessi:
   - "Edit"
   - "Write"
   - "Bash(node:*)"
+  - "Bash(yq:*)"
   - "Bash(git:*)"
   - "Bash(gh issue view:*)"
   - "Bash(gh pr view:*)"
 
 percorsi_protetti:
   - "ui/*.test.js"
+  - "template/scripts/*.test.js"
   - ".github/workflows/**"
   - "specs/**"
   - ".specify/**"

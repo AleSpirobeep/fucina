@@ -6,14 +6,22 @@
 
 - `ui/` — il Registro (spec 002): una pagina statica che interroga l'API di GitHub.
   `index.html` è la pagina, `lib.js` la logica pura, `lib.test.js` i suoi test.
-- `specs/` — cosa deve fare ogni cosa. La spec attiva è `specs/002-registro/spec.md`.
+- `specs/` — cosa deve fare ogni cosa. La spec attiva è `specs/003-pm-a-cicli/`
+  (`spec.md`, `plan.md`, `contracts/`, `tasks.md`): leggi i contratti prima del codice.
 - `docs/decisions/` — perché è fatto così. Non contraddire un ADR accettato.
 - `template/`, `plugin/`, `init.sh` — la fucina stessa. **Non toccarli** se l'issue non li
-  nomina: sono ciò che fa girare l'agente che sta leggendo queste righe.
+  nomina: sono ciò che fa girare l'agente che sta leggendo queste righe. Quando l'issue li
+  nomina (spec 003), ricorda che `template/.github/workflows/` contiene **modelli** copiati
+  da `init.sh` nei repo di destinazione, non i workflow attivi di questo repo.
+- `template/scripts/` — script installati nei repo di destinazione (`pm-coda.js`, `pm.ps1`).
+  La logica testabile va in funzioni pure esportate, con test in
+  `template/scripts/<argomento>.test.js` e fixture in `template/scripts/fixtures/`.
 
 ## Comandi
 
-- Test: `node --test ui/` — nessuna dipendenza, nessun `npm install`.
+- Test: `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — nessuna
+  dipendenza, nessun `npm install`.
+- YAML dei workflow: `yq '.' <file>` deve uscire 0.
 
 ## Regole per `ui/`
 
