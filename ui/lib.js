@@ -45,6 +45,22 @@ export function estraiSezioni(corpo) {
   return risultato;
 }
 
+export function ultimoCommento(commenti) {
+  const lista = commenti || [];
+  return lista.length === 0 ? null : lista[lista.length - 1].body;
+}
+
+export function elementoPrCoda(pr) {
+  const sezioni = estraiSezioni(pr.body);
+  return {
+    numero: pr.number,
+    titolo: pr.title,
+    url: pr.html_url,
+    nonFatto: sezioni.nonFatto,
+    fattoInPiu: sezioni.fattoInPiu,
+  };
+}
+
 export function parseElencoRepo(testo) {
   return (testo || "")
     .split("\n")

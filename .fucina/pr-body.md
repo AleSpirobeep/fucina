@@ -1,26 +1,28 @@
-Implementa la funzione pura `estraiSezioni(corpo)` in `ui/lib.js` (REQ-110 parte, REQ-141): dato il corpo markdown di una PR, restituisce `{ nonFatto, fattoInPiu, decisioni }` con il testo di ciascuna sezione o `null` se l'intestazione (`## Non fatto`, `## Fatto in più`, `## Decisioni`, in qualsiasi ordine) non compare.
+Implementa la sezione **"Aspettano te"** (REQ-110, REQ-111, REQ-112, REQ-113) in cima alla dashboard: per ogni repo configurato, le issue con `needs-human` (con in linea l'ultimo commento) e le PR con `needs-review` (con le sezioni **Non fatto**/**Fatto in più** estratte dal corpo e lo stato dei check verde/rosso/in attesa). Se la coda è vuota su tutti i repo, la sezione mostra "Niente aspetta te".
 
-Il testo di ogni sezione va da dopo l'intestazione fino alla prossima intestazione di livello 2 (o alla fine del corpo); un'intestazione di livello 3+ dentro una sezione non la interrompe. Prima di riconoscere le sezioni, il corpo viene ripulito della coda che il workflow accoda dopo l'ultima sezione (ADR `2026-09-02-1700-pr-aperta-dal-workflow.md`): righe finali `Closes #N` e `Generated with Claude Code ...`. Un `Closes #N` che compare *prima* delle sezioni riconosciute non viene toccato.
+Due nuove funzioni pure in `ui/lib.js`, che riusano quanto fatto da T3 (client GitHub) e T5 (`estraiSezioni`, `classifica`):
+- `ultimoCommento(commenti)`: corpo dell'ultimo commento di un elenco, o `null` se vuoto.
+- `elementoPrCoda(pr)`: numero, titolo, url e le due sezioni (`nonFatto`, `fattoInPiu`) estratte dal corpo della PR con `estraiSezioni`.
 
-**Verificato con:** `node --test "ui/**/*.test.js"` — 77/77 verdi. I nuovi test sono in `ui/estraiSezioni.test.js`, su:
-- il corpo reale della PR #6 di `fucina-lab` (salvato in `ui/fixtures/pr-body-6.md`), sezioni in ordine Decisioni/Non fatto/Fatto in più, coda `Closes #5` esclusa;
-- il corpo reale della PR #9 di `fucina-lab` (salvato in `ui/fixtures/pr-body-9.md`), con `Closes #8` a metà corpo (non tocca le sezioni) e la coda finale `Generated with Claude Code ...` + `Closes #8` esclusa dall'ultima sezione;
-- un corpo senza sezioni (tutte e tre le chiavi `null`);
-- una sezione con solo "Nulla" restituita come testo, non `null`;
-- intestazioni in ordine sparso;
-- un'intestazione di livello 3 dentro una sezione che non la interrompe;
-- coda finale (`Closes #N` + riga "Generated with Claude Code") esclusa dall'ultima sezione, caso isolato.
+`ui/index.html` aggiunge la sezione `#aspettanoTe`: per repo, chiama `classifica()` su issue aperte e PR aperte per ottenere `bloccate`/`inRevisione`, poi per ogni issue bloccata recupera i commenti (`commentiIssue`) e per ogni PR in revisione lo stato dei check (`statoCheckPr` sulla `head.sha`). Ogni elemento porta il link a GitHub (REQ-111). Un errore su un repo mostra il messaggio d'errore invece di lasciar intendere una coda vuota; "Niente aspetta te" compare solo quando nessun repo ha elementi e nessuno è andato in errore.
+
+**Verificato con:** `node --test "ui/**/*.test.js"` — 83/83 verdi. I nuovi test sono in `ui/aspettano-te.test.js`:
+- `ultimoCommento` su elenco vuoto/assente (`null`), su un elenco semplice, e sui commenti reali della issue 1 di `fucina-lab` (fixture `ui/fixtures/issue-1-fucina-lab-commenti.json`, presi da `gh issue view 1 --repo AleSpirobeep/fucina-lab --comments`): restituisce il commento sui tentativi esauriti, non il primo della lista;
+- `elementoPrCoda` sul corpo reale della PR #6 di `fucina-lab` (fixture già esistente `ui/fixtures/pr-body-6.md`), e su un corpo senza sezioni (`nonFatto`/`fattoInPiu` a `null`);
+- `classifica` su elenchi vuoti conferma `bloccate`/`inRevisione` vuoti (base della coda vuota).
+
+La combinazione con `statoCheckPr` (che richiede una chiamata di rete per il check status) e il rendering non sono testabili senza browser/rete: verificati leggendo il codice contro REQ-112 (tre soli stati, nessun check elencato) e REQ-113.
 
 ## Decisioni
 
-Nessun ADR nuovo: le regole sulla coda del workflow e sull'ordine delle sezioni erano già decise nei commenti della issue e nell'ADR `2026-09-02-1700-pr-aperta-dal-workflow.md`; l'unica scelta implementativa (livello 3+ non interrompe una sezione) era già stata validata nel tentativo precedente su questa stessa issue.
+Nessun ADR nuovo: la divisione `lib.js`/`github.js` e gli endpoint da usare erano già decisi nell'ADR `2026-09-03-1131-client-github-check-run-e-struttura.md` (T5); qui la coda riusa semplicemente `commentiIssue` e `statoCheckPr` senza toccare `fetch`.
 
 ## Non fatto
 
-Nulla: tutti i criteri di accettazione della issue, inclusi quelli aggiunti nei commenti del PM (fixture reali, esclusione della coda `Closes #N`/`Generated with Claude Code`), sono coperti.
+Nulla: i tre criteri di accettazione della issue sono coperti (issue 1 di `fucina-lab` con il suo ultimo commento, PR `needs-review` con le due sezioni, messaggio "Niente aspetta te" a coda vuota).
 
 ## Fatto in più
 
-Nulla: solo `ui/lib.js`, il nuovo file di test `ui/estraiSezioni.test.js` e le due nuove fixture `ui/fixtures/pr-body-6.md` e `ui/fixtures/pr-body-9.md` sono stati toccati.
+Nulla: solo `ui/lib.js`, `ui/index.html`, il nuovo file di test `ui/aspettano-te.test.js` e la nuova fixture `ui/fixtures/issue-1-fucina-lab-commenti.json` sono stati toccati.
 
-Closes #15
+Closes #18

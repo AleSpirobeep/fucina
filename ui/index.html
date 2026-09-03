@@ -28,6 +28,11 @@
       <button id="apriConfigurazione">Configurazione</button>
       <button id="dimenticaToken">Dimentica il token</button>
 
+      <section id="aspettanoTe">
+        <h2>Aspettano te</h2>
+        <div id="elencoAspettanoTe"></div>
+      </section>
+
       <section id="avanzamento">
         <h2>Avanzamento</h2>
         <div id="tabelleAvanzamento"></div>
@@ -48,9 +53,18 @@
         tabellaAvanzamento,
         agentiAttivi,
         formattaTempoTrascorso,
+        ultimoCommento,
+        elementoPrCoda,
         ErroreGitHub,
       } from "./lib.js";
-      import { issueAperte, issueChiuseDiRecente, prAperte, runWorkflow } from "./github.js";
+      import {
+        issueAperte,
+        issueChiuseDiRecente,
+        prAperte,
+        commentiIssue,
+        statoCheckPr,
+        runWorkflow,
+      } from "./github.js";
 
       const CHIAVE_TOKEN = "fucina.token";
       const CHIAVE_REPO = "fucina.repoTesto";
@@ -63,6 +77,7 @@
       const erroreConfigurazione = document.getElementById("erroreConfigurazione");
       const tabelleAvanzamento = document.getElementById("tabelleAvanzamento");
       const elencoAgentiAttivi = document.getElementById("elencoAgentiAttivi");
+      const elencoAspettanoTe = document.getElementById("elencoAspettanoTe");
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
@@ -195,9 +210,99 @@
         }
       }
 
+      function costruisciVoceIssueBloccata(issue, commento) {
+        const voce = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = issue.html_url;
+        link.textContent = issue.title;
+        voce.appendChild(link);
+        if (commento) {
+          const p = document.createElement("p");
+          p.textContent = commento;
+          voce.appendChild(p);
+        }
+        return voce;
+      }
+
+      function costruisciVocePrInRevisione(elemento, statoCheck) {
+        const voce = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = elemento.url;
+        link.textContent = elemento.titolo;
+        voce.appendChild(link);
+        voce.append(` — check: ${statoCheck}`);
+
+        const nonFatto = document.createElement("p");
+        nonFatto.textContent = `Non fatto: ${elemento.nonFatto || "(sezione assente dal corpo della PR)"}`;
+        voce.appendChild(nonFatto);
+
+        const fattoInPiu = document.createElement("p");
+        fattoInPiu.textContent = `Fatto in più: ${elemento.fattoInPiu || "(sezione assente dal corpo della PR)"}`;
+        voce.appendChild(fattoInPiu);
+
+        return voce;
+      }
+
+      async function caricaAspettanoTe() {
+        const token = tokenSalvato();
+        const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
+        elencoAspettanoTe.innerHTML = "";
+        let haElementi = false;
+        let haErrore = false;
+
+        for (const repo of repos) {
+          try {
+            const [issueAperteRepo, prRepo] = await Promise.all([
+              issueAperte(token, repo),
+              prAperte(token, repo),
+            ]);
+            const classificazione = classifica(issueAperteRepo, prRepo, new Date().toISOString());
+            const issueBloccate = classificazione.bloccate;
+            const prInRevisione = classificazione.inRevisione;
+
+            if (issueBloccate.length === 0 && prInRevisione.length === 0) continue;
+            haElementi = true;
+
+            const sezione = costruisciSezioneRepo(repo);
+            const elenco = document.createElement("ul");
+
+            for (const issue of issueBloccate) {
+              const commenti = await commentiIssue(token, repo, issue.number);
+              elenco.appendChild(costruisciVoceIssueBloccata(issue, ultimoCommento(commenti)));
+            }
+
+            for (const pr of prInRevisione) {
+              const statoCheck = await statoCheckPr(token, repo, pr.head.sha);
+              elenco.appendChild(costruisciVocePrInRevisione(elementoPrCoda(pr), statoCheck));
+            }
+
+            sezione.appendChild(elenco);
+            elencoAspettanoTe.appendChild(sezione);
+          } catch (errore) {
+            haErrore = true;
+            const sezione = costruisciSezioneRepo(repo);
+            const messaggio = document.createElement("p");
+            messaggio.setAttribute("role", "alert");
+            messaggio.textContent =
+              errore instanceof ErroreGitHub
+                ? errore.message
+                : "Errore nel caricamento della coda.";
+            sezione.appendChild(messaggio);
+            elencoAspettanoTe.appendChild(sezione);
+          }
+        }
+
+        if (!haElementi && !haErrore) {
+          const messaggio = document.createElement("p");
+          messaggio.textContent = "Niente aspetta te";
+          elencoAspettanoTe.appendChild(messaggio);
+        }
+      }
+
       function mostraDashboard() {
         sezioneConfigurazione.hidden = true;
         sezioneDashboard.hidden = false;
+        caricaAspettanoTe();
         caricaAvanzamento();
         caricaAgentiAttivi();
       }
