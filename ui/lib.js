@@ -49,6 +49,71 @@ function statoPiuAvanzato(nomi) {
   return "backlog";
 }
 
+const API_BASE = "https://api.github.com";
+
+export function urlIssueAperte(repo) {
+  return `${API_BASE}/repos/${repo}/issues?state=open&per_page=100`;
+}
+
+export function urlIssueChiuseDiRecente(repo) {
+  return `${API_BASE}/repos/${repo}/issues?state=closed&sort=updated&direction=desc&per_page=100`;
+}
+
+export function urlPrAperte(repo) {
+  return `${API_BASE}/repos/${repo}/pulls?state=open&per_page=100`;
+}
+
+export function urlCommentiIssue(repo, numero) {
+  return `${API_BASE}/repos/${repo}/issues/${numero}/comments`;
+}
+
+export function urlCheckRuns(repo, ref) {
+  return `${API_BASE}/repos/${repo}/commits/${ref}/check-runs`;
+}
+
+export function urlRunWorkflow(repo) {
+  return `${API_BASE}/repos/${repo}/actions/workflows/dev-agent.yml/runs?per_page=50`;
+}
+
+export class ErroreGitHub extends Error {
+  constructor(codice, messaggio) {
+    super(messaggio);
+    this.codice = codice;
+  }
+}
+
+export function messaggioErroreHttp(status, repo) {
+  if (status === 401) return "Token non valido o scaduto.";
+  if (status === 404) return `Il repository ${repo} non esiste o non è raggiungibile.`;
+  return `Richiesta a GitHub fallita (codice ${status}).`;
+}
+
+// Le run duplicano gli eventi (push, pull_request) sullo stesso commit: si aggregano tutte.
+// Un rosso prevale sempre su un'attesa, anche se altre run dello stesso batch sono ancora in corso.
+const CONCLUSIONI_ROSSE = new Set([
+  "failure",
+  "timed_out",
+  "cancelled",
+  "action_required",
+  "startup_failure",
+]);
+
+export function interpretaStatoCheckRuns(checkRuns) {
+  const run = checkRuns || [];
+  if (run.length === 0) return "in attesa";
+
+  let inAttesa = false;
+  for (const r of run) {
+    if (r.status !== "completed") {
+      inAttesa = true;
+      continue;
+    }
+    if (CONCLUSIONI_ROSSE.has(r.conclusion)) return "rosso";
+  }
+
+  return inAttesa ? "in attesa" : "verde";
+}
+
 export function classifica(issues, prs, oggi) {
   const risultato = {
     backlog: [],
