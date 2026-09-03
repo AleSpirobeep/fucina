@@ -1,0 +1,25 @@
+{
+  "rapporto": 1,
+  "pr": [
+    {
+      "numero": 43,
+      "titolo": "T009: correzione minore",
+      "labels": [
+        "needs-review"
+      ],
+      "corpo": "**Corpo mancante.** Lagente non ha scritto `.fucina/pr-body.md`, quindi questa PR non ha le sezioni \"Non fatto\" e \"Fatto in piu\". Leggi il diff per intero prima di approvare, e considera il ruolo da correggere.\n\nCloses #12\n",
+      "check": "verde",
+      "ultimoCommentoPm": false
+    }
+  ],
+  "issue": [
+    {
+      "numero": 12,
+      "titolo": "T009: correzione minore",
+      "labels": [
+        "in-progress"
+      ],
+      "ultimoCommentoPm": false
+    }
+  ]
+}

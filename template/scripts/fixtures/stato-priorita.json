@@ -1,0 +1,33 @@
+{
+  "rapporto": 26,
+  "pr": [
+    {
+      "numero": 40,
+      "titolo": "T003: somma configurabile",
+      "labels": [
+        "needs-review"
+      ],
+      "corpo": "`totale_documento` accetta ora un parametro opzionale `modalita_arrotondamento`\ncon due valori ammessi:\n\n- `\"per_riga\"` (default, invariato): arrotonda ogni riga e poi somma.\n- `\"per_documento\"`: somma gli importi esatti delle righe e arrotonda solo il\n  totale finale.\n\nIl default resta `\"per_riga\"` per decisione esplicita di @AleSpirobeep nel\nthread dell'issue: nessuna rottura di compatibilità per chi già chiama\n`totale_documento(righe)` senza specificare la modalità.\n\nPer calcolare l'importo esatto di riga (necessario alla modalità\n`\"per_documento\"`) `totale_riga` è stato scomposto in una funzione interna\n`_totale_riga_esatto`, che condivide sconto e IVA ma non arrotonda il\nrisultato finale; `totale_riga` ora è un sottile involucro che arrotonda il\nsuo output.\n\n**Verifica:** `pytest -q` — 30 test, tutti verdi (26 preesistenti + 4 nuovi\nin `tests/test_arrotondamento_documento.py`). Il nuovo test\n`test_scostamento_fra_le_due_modalita` dimostra lo scostamento richiesto\ndai criteri di accettazione: 7 righe da 0,01 € con IVA ridotta (ogni riga\nvale esattamente 0,011 €) danno 0,07 € in modalità \"per_riga\" e 0,08 € in\nmodalità \"per_documento\".\n\n## Decisioni\n\n- `docs/decisions/2026-09-02-1650-arrotondamento-documento-configurabile.md`:\n  registra la decisione sul default (opzione \"per_riga\", presa da\n  @AleSpirobeep) e la scelta implementativa di non arrotondare lo sconto in\n  meno rispetto a prima.\n\n## Non fatto\n\n- Nessuna funzione di conversione o migrazione per chi ha già dati calcolati\n  con la modalità \"per_riga\" e volesse ricalcolarli in \"per_documento\": non\n  richiesto dai criteri di accettazione.\n\n## Fatto in più\n\nNulla: solo `listino/prezzi.py`, il nuovo file di test e il nuovo ADR sono\nstati toccati.\n\nCloses #5\n",
+      "check": "verde",
+      "ultimoCommentoPm": false
+    }
+  ],
+  "issue": [
+    {
+      "numero": 30,
+      "titolo": "T002: altro task",
+      "labels": [
+        "needs-human"
+      ],
+      "ultimoCommentoPm": false
+    },
+    {
+      "numero": 31,
+      "titolo": "T005: prossimo task",
+      "labels": [
+        "in-coda"
+      ],
+      "ultimoCommentoPm": false
+    }
+  ]
+}

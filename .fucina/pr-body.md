@@ -1,73 +1,49 @@
-Applica alla dashboard del Registro l'identità visiva della fucina (T11): palette a
-neutri freddi verde-grigi con tema chiaro/scuro secondo `prefers-color-scheme`,
-accento petrolio per gli elementi automatici, accento ambra per "Aspettano te" e per
-il pulsante "Rispondi e riavvia", tipografia Archivo/Newsreader/JetBrains Mono,
-impaginazione per schermi da 1200 px in su.
+Crea `template/scripts/pm-coda.js` (T001, spec 003): decide cosa deve fare il PM a ogni
+ciclo, secondo `specs/003-pm-a-cicli/contracts/pm-coda.md` e la forma dati di
+`data-model.md` (§1 input, §2 output). Nessuna dipendenza, CommonJS.
 
 ## Cosa ho fatto
 
-Tutto in `ui/index.html` (blocco `<style>`, `<link>` ai font, e due piccoli tocchi di
-markup), senza toccare `lib.js`, `github.js` o la logica dello script:
-
-- **Palette**: variabili CSS per neutri freddi verde-grigi, ridefinite sotto
-  `@media (prefers-color-scheme: dark)`. Accento petrolio (`--colore-accento`) su
-  link, pulsanti e intestazioni di tabella. Accento ambra riservato a `#aspettanoTe`
-  (sfondo, bordo sinistro spesso, testo) e al pulsante "Rispondi e riavvia"
-  (`.rispondi-form button`).
-- **Tipografia**: Archivo per i titoli, Newsreader per il testo, JetBrains Mono per
-  tabelle/etichette/orari, caricati da un unico foglio di stile su
-  `fonts.googleapis.com`, con fallback di sistema dichiarati in ogni variabile
-  `--font-*`. Motivazione dell'interpretazione del vincolo sui font (i file binari
-  arrivano comunque da `fonts.gstatic.com`, inevitabile per chiunque usi Google
-  Fonts) in
-  [`docs/decisions/2026-09-03-1541-font-da-google-fonts.md`](../docs/decisions/2026-09-03-1541-font-da-google-fonts.md).
-- **Impaginazione**: `body` con `min-width: 1200px` e `max-width: 1400px`; "Avanzamento"
-  e "Agenti attivi" in un contenitore `.griglia-secondaria` (`grid-template-columns:
-  minmax(0, 2fr) minmax(0, 1fr)`) sotto "Aspettano te" a piena larghezza; tabelle con
-  `table-layout: fixed`.
-- **Correzione dello scroll orizzontale con token lunghi senza spazi** (richiesta del
-  PM dopo la revisione della PR #41, chiusa): i figli diretti di `.griglia-secondaria`
-  hanno `min-width: 0` e le tracce della griglia sono `minmax(0, …)`, così non possono
-  più superare la loro colonna; `overflow-wrap: anywhere` su `body` (proprietà
-  ereditata) fa andare a capo qualunque token senza spazi in liste, paragrafi, celle
-  di tabella e link generati dallo script — a differenza di `overflow-wrap:
-  break-word`, `anywhere` riduce anche la dimensione minima automatica usata da
-  griglia/tabelle nel calcolo del layout, che è la causa dello scroll segnalato.
+- `template/scripts/pm-coda.js` esporta `decidi(stato)`, `estraiSezioniMancanti(corpo)`,
+  `identificativoTask(titolo)`. Applica le regole 1a–1d (PR `needs-review` senza
+  `needs-human` e non ancora vista: check rosso → `rimanda-check-rossi`, check in corso →
+  `attendi-check`, sezioni mancanti → `rimanda-corpo-incompleto`, altrimenti `revisione`),
+  2 (issue `needs-human` non ancora vista → `domanda`), 3 (nessuna PR/issue attiva e almeno
+  un task `in-coda` con identificativo valido → `avvia-task` con l'identificativo più basso,
+  ordinato numero poi suffisso: `T004` < `T004a` < `T004b` < `T005`), 4 (`niente`).
+  `estraiSezioniMancanti` reimplementa (non importa da `ui/lib.js`, che nel repo di
+  destinazione non esiste) il riconoscimento di `## Non fatto` / `## Fatto in più`,
+  insensibile a maiuscole, `###` e spazi. `identificativoTask` accetta `T` seguita da
+  almeno tre cifre e al più una lettera minuscola come parola intera (`ST001` non è
+  valido).
+- CLI: eseguito da riga di comando (`node scripts/pm-coda.js < stato.json`) legge lo stato
+  da stdin e stampa la decisione in JSON su stdout con exit 0; input non JSON o senza le
+  chiavi `pr`/`issue` → messaggio su stderr, exit 2. Eseguito come modulo (`require`) non
+  registra alcun listener su stdin.
+- `template/scripts/pm-coda.test.js` (`node:test`/`node:assert`, 37 test): una per ogni
+  regola del contratto, le 12 fixture della tabella con la decisione attesa, l'ordine di
+  priorità (PR verde batte issue `needs-human` batte task in coda), l'ordine dei task in
+  coda con i suffissi, `ST001` non valido, la nota su issue `in-coda` con un'altra label di
+  stato (non parte), la nota su PR `needs-review`+`needs-human` (blocca la coda),
+  `estraiSezioniMancanti` sui corpi delle PR #6 e #9 di fucina-lab (entrambe complete) e sul
+  corpo minimo del workflow (entrambe mancanti), e il comportamento della CLI (stdin/stdout,
+  errori, nessuna lettura di stdin come modulo).
+- `template/scripts/fixtures/`: le 12 fixture JSON della tabella del contratto, più le
+  copie letterali di `ui/fixtures/pr-body-6.md` e `pr-body-9.md` (già coperte da
+  `.gitattributes` come `-text`, nessuna conversione CRLF).
 
 ## Come l'ho verificato
 
-- `node --test "ui/**/*.test.js"` → 113/113 verdi (nessun test nuovo: task solo
-  CSS/markup, nessuna funzione pura nuova in `lib.js`).
-- Verifica visiva in Chromium headless (via CDP, `Emulation.setDeviceMetricsOverride`
-  1280×900 e `Emulation.setEmulatedMedia` per i due temi) su una pagina di prova che
-  riproduce il markup reale con contenuto realistico e con un token di 100 caratteri
-  senza spazi (tipo nome di branch) inserito in ogni punto indicato dal PM: banner
-  d'errore, titolo e commento di una issue `needs-human` in "Aspettano te", sezioni
-  "Non fatto"/"Fatto in più" di una PR `needs-review`, ogni cella della tabella di
-  "Avanzamento" (sei colonne), titolo di un run `dev-agent` in "Agenti attivi". In
-  entrambi i temi `document.documentElement.scrollWidth` coincide con `clientWidth`
-  (1280 = 1280): nessuno scroll orizzontale. Controllate anche a schermo le
-  screenshot dei due temi: "Aspettano te" resta chiaramente distinta in ambra, il
-  contrasto testo/sfondo del pulsante "Rispondi e riavvia" è leggibile in entrambi.
-
-Closes #23
-
-## Decisioni
-
-- [2026-09-03-1541-font-da-google-fonts.md](../docs/decisions/2026-09-03-1541-font-da-google-fonts.md):
-  il vincolo "solo `fonts.googleapis.com`" si applica al dominio dichiarato dalla
-  pagina (il `<link>` del foglio di stile); `fonts.gstatic.com`, da cui Google serve
-  i file dei font, non è un dominio scelto dalla pagina ma un dettaglio implementativo
-  inevitabile di Google Fonts.
+`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` → 150/150 verdi (150 = 113
+esistenti in `ui/` + 37 nuovi in `template/scripts/`), nessun test esistente modificato.
+Nessun file `.github/workflows/**` toccato: solo `template/scripts/`.
 
 ## Non fatto
 
-Nulla dei criteri di accettazione della issue, incluso quello aggiunto dal PM dopo la
-revisione della PR #41: a 1280 px nulla scorre orizzontalmente anche con titoli,
-commenti e URL senza spazi lunghi 100 caratteri, in ogni sezione (verificato sopra).
+Il workflow che chiama questo script (`template/.github/workflows/pm-agent.yml`, T002) e
+tutto ciò che segue (T003–T008): fuori dal perimetro di questa issue, che copre solo la
+parte decisionale (REQ-210–216).
 
 ## Fatto in più
 
-Ho aggiunto la classe `rispondi-form` al contenitore del modulo "Rispondi e riavvia"
-in `costruisciFormRispondiERiavvia` (`ui/index.html`), per poterlo selezionare in CSS
-senza toccare `lib.js`: presentazione, non logica.
+Nulla oltre a quanto richiesto dal contratto e dai criteri di accettazione.

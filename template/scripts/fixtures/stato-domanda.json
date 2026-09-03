@@ -1,0 +1,14 @@
+{
+  "rapporto": 1,
+  "pr": [],
+  "issue": [
+    {
+      "numero": 30,
+      "titolo": "T002: serve una decisione",
+      "labels": [
+        "needs-human"
+      ],
+      "ultimoCommentoPm": false
+    }
+  ]
+}

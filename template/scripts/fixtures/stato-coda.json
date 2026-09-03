@@ -1,0 +1,8 @@
+{
+  "rapporto": 1,
+  "pr": [],
+  "issue": [
+    { "numero": 12, "titolo": "T002: aggiungi la validazione", "labels": ["in-coda"], "ultimoCommentoPm": false },
+    { "numero": 13, "titolo": "T003: aggiorna la documentazione", "labels": ["in-coda"], "ultimoCommentoPm": false }
+  ]
+}
