@@ -1,43 +1,41 @@
-Implementa T8 — la sezione "Agenti attivi" del Registro (REQ-121).
+Implementa T12 — lo script di avvio `ui/apri.ps1` (REQ-143).
 
-- `ui/lib.js`: due nuove funzioni pure.
-  - `agentiAttivi(runs)` filtra le run del workflow `dev-agent` (già lette da
-    `runWorkflow`, T5) a quelle in stato `in_progress` o `queued`, e le riduce a
-    `{ titolo, url, avviatoA }` — titolo preso dal titolo del run (`display_title`,
-    che GitHub imposta al titolo della issue per un workflow innescato da
-    `issues: labeled`), url del run, e istante di avvio.
-  - `formattaTempoTrascorso(avviatoA, adesso)` formatta la differenza in una stringa
-    leggibile: "meno di 1 min", "N min", "N h" o "N h M min". Non scende mai sotto
-    zero, per tollerare piccoli sfasamenti fra l'orologio del client e quello di
-    GitHub.
-- `ui/index.html`: nuova sezione "Agenti attivi" nella dashboard, una sottosezione
-  per repo (stesso pattern di "Avanzamento"): elenco di link al run col tempo
-  trascorso, o "Nessun agente al lavoro" se il repo non ha run attive. Si carica
-  insieme all'avanzamento all'apertura della dashboard, con lo stesso trattamento
-  degli errori (token scaduto, repo non raggiungibile) già usato altrove.
-- `ui/agenti-attivi.test.js`: dodici test nuovi per le due funzioni pure, inclusi i
-  casi limite (elenco vuoto, run non ancora avviata secondo l'orologio locale,
-  soglia esatta dell'ora).
+- `ui/apri.ps1`: script PowerShell 5.1 compatibile che:
+  - cerca `python`/`py`/`python3` sul `PATH`; se nessuno è disponibile, spiega cosa
+    manca e si ferma senza avviare nulla;
+  - se non trova un server già attivo (vedi sotto), cerca una porta libera fra 8000 e
+    8099 provando una connessione TCP diretta, avvia `python -m http.server <porta>`
+    con la cartella `ui/` come working directory, in una finestra nascosta, e attende
+    fino a 5 secondi che risponda;
+  - salva la porta usata in `ui/.apri-stato.json`; al riavvio, se quella porta risponde
+    ancora a una connessione TCP, non avvia un secondo server e apre solo il browser;
+  - apre il browser predefinito su `http://localhost:<porta>/index.html`.
+- `.gitignore`: aggiunta `ui/.apri-stato.json` (file di stato runtime, non va in git).
 
-Verificato con `node --test "ui/**/*.test.js"`: 70 test, tutti verdi.
+Verificato con `node --test "ui/**/*.test.js"`: 70 test, tutti verdi (lo script non
+introduce funzioni JS, quindi non aggiunge test a quel comando). Ho riletto lo script
+riga per riga contro la sintassi di PowerShell 5.1 (niente operatori o cmdlet
+introdotti dopo, `ConvertTo-Json`/`ConvertFrom-Json` e `$PSScriptRoot` sono
+disponibili da PS 3.0/5.0). Non ho potuto eseguirlo su un Windows reale né avviare un
+browser da questo ambiente: `pwsh` non è fra gli strumenti permessi da `.fucina.yml`
+(`strumenti_permessi` elenca solo `Bash(node:*)` e `Bash(git:*)`) e comunque qui non
+c'è un display per verificare l'apertura del browser.
 
 ## Decisioni
 
-Nessun ADR aggiunto. Non è stata necessaria una chiamata separata alle issue per
-ricavare il numero: il titolo del run già coincide col titolo della issue che lo ha
-innescato (comportamento di default di GitHub per un workflow legato a un evento
-`issues`), quindi mostro quel titolo così com'è, come richiesto dalla issue
-("dal titolo del run").
+- [`docs/decisions/2026-09-03-1200-rilevamento-server-attivo-in-apri-ps1.md`](../docs/decisions/2026-09-03-1200-rilevamento-server-attivo-in-apri-ps1.md):
+  come lo script riconosce che un server è già attivo (file di stato con la porta,
+  verificata con una connessione TCP diretta, non un PID).
 
 ## Non fatto
 
-Il collaudo dal vivo del criterio "avviando un run su fucina-lab compare entro un
-aggiornamento; alla fine scompare" richiede di avviare un run vero su un altro repo e
-osservare la pagina in un browser: non verificabile da qui. La logica di
-caricamento segue esattamente il pattern già in produzione per "Avanzamento"
-(stesso ciclo per repo, stessa gestione degli errori), quindi il rischio è
-contenuto, ma resta da confermare a mano.
+Il collaudo dal vivo dei tre criteri di accettazione (`.\ui\apri.ps1` apre il
+browser sulla dashboard; un secondo avvio non apre un secondo server; funziona da
+PowerShell 5.1) richiede una macchina Windows con Python installato: non verificabile
+da questo ambiente Linux. Ho verificato invece che i test JS esistenti restano verdi e
+ho riletto lo script contro la sintassi PowerShell 5.1.
 
 ## Fatto in più
 
-Nulla: solo i file toccati sopra.
+`.gitignore`: aggiunta una riga per ignorare `ui/.apri-stato.json`, il file di stato
+che lo script scrive alla prima esecuzione.
