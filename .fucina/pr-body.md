@@ -1,23 +1,73 @@
-Due modifiche minime a `template/.github/workflows/dev-agent.yml` per REQ-262 (spec `003-pm-a-cicli`), preparatorie al PM automatico:
+## Cosa ho fatto
 
-1. Nel passo "Segnala il fallimento del run": `GH_TOKEN` usa `secrets.FUCINA_PAT || secrets.GITHUB_TOKEN` come negli altri passi, e `gh issue edit` rimette `ready-for-dev` oltre a togliere `in-progress`, con un commento che spiega perché il riavvio non può girare all'infinito.
-2. Nel job `implementa`: la condizione `if:` esclude le issue con label `rapporto-pm`, così l'agente sviluppatore non tenta mai di "implementare" l'issue di rapporto del PM.
+Installazione del PM (REQ-260, REQ-261), come richiesto da T007 e aggiornato dal
+commento dell'issue (T002 ha introdotto `template/scripts/raccogli-stato.sh`, non
+elencato nel testo originale della issue né in `tasks.md`, ma richiamato a runtime
+da `pm-agent.yml`):
 
-Il riavvio non può girare all'infinito perché: il passo "Conta i tentativi precedenti" conta ogni tentativo *prima* di eseguire l'agente, e trasforma il riavvio in `needs-human` (togliendo `ready-for-dev`) appena i tentativi sono esauriti; il passo "Segnala il fallimento del run" gira solo `if: ... && steps.tentativi.outputs.stop == 'false'`, cioè solo quando il tentativo è già stato contato; quindi ogni riavvio consuma un tentativo del contatore, che è finito.
+- `init.sh`: la funzione `copia` ora installa cinque file — oltre a
+  `template/.github/workflows/pm-agent.yml` → `.github/workflows/pm-agent.yml`,
+  `template/scripts/pm-coda.js` → `scripts/pm-coda.js`,
+  `template/scripts/pm.ps1` → `scripts/pm.ps1` e
+  `plugin/skills/pm-agent/SKILL.md` → `.claude/skills/pm-agent/SKILL.md`, anche
+  `template/scripts/raccogli-stato.sh` → `scripts/raccogli-stato.sh`. `crea_label`
+  crea `in-coda` (`5A6E8C`) e `rapporto-pm` (`2C6E49`). Il blocco dei passi manuali
+  finali guadagna un quinto punto: scope `workflow` sul login `gh` locale (con
+  `gh auth refresh -s workflow` se manca), il PM installato spento e acceso con
+  `scripts/pm.ps1 avvia`, e la convenzione `in-coda` + titolo `T001: …` per le
+  issue dei task.
+- `template/.fucina.yml`: chiave `pm` con i default di `contracts/fucina-yml.md`
+  (modello, `max_turns`, `max_budget_usd`, `attesa_check_minuti`,
+  `titolo_rapporto`, `strumenti_permessi`), commentata riga per riga.
+- `template/CLAUDE.md`: una sezione breve su `scripts/pm-coda.js` e
+  `scripts/pm.ps1`, e sul fatto che l'issue `rapporto-pm` non va mai presa in
+  carico dall'agente sviluppatore.
+- `README.md`: sezione «Il PM a cicli» (22 righe) — cosa fa, come si accende e si
+  spegne, dove legge la configurazione, cosa costa.
 
-**Verificato con:**
-- `yq '.' template/.github/workflows/dev-agent.yml` esce 0
-- `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` → 150/150 verdi
-- `git diff --stat` tocca un solo file
+Closes #49
+
+## Come l'ho verificato
+
+`bash -n init.sh`:
+```
+(nessun output — exit 0)
+```
+
+`yq '.pm.max_turns' template/.fucina.yml`:
+```
+40
+```
+
+`yq '.pm.strumenti_permessi | length' template/.fucina.yml`:
+```
+13
+```
+
+Verificato esplicitamente, leggendo `template/.github/workflows/pm-agent.yml`, che
+sia `scripts/pm-coda.js` (righe 179, 675, 700) sia `scripts/raccogli-stato.sh`
+(righe 148, 674, 699) — gli unici due file che il workflow richiama a runtime con
+`node`/`bash` — sono fra i cinque installati da `init.sh`.
+
+Suite completa: `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` →
+150/150 verdi. Nessun test nuovo: questa issue tocca solo `init.sh` (bash,
+verificato con `bash -n`), YAML e Markdown, nessuna funzione JS nuova.
+
+Nessun token o valore di secret in nessun file toccato (solo nomi di secret già
+presenti: `CLAUDE_CODE_OAUTH_TOKEN`, `FUCINA_PAT`).
 
 ## Decisioni
 
-Nulla: nessun ADR necessario, le due modifiche sono già specificate letteralmente in `plan.md` (sezione «Modifiche a `dev-agent.yml`») e nell'issue.
+Nessun ADR nuovo: tutte le scelte erano già coperte dal testo della issue, dal
+commento di chiarimento su `raccogli-stato.sh`, e da `contracts/fucina-yml.md`.
 
 ## Non fatto
 
-Nulla: entrambe le modifiche richieste da REQ-262/T006 sono state applicate esattamente come descritte nel piano.
+Nulla dei criteri della issue (aggiornati dal commento). `template/.github/workflows/
+dev-agent.yml` (REQ-262, task T006) non è toccato: non è nell'ambito di questa
+issue ed è già stato applicato in precedenza.
 
 ## Fatto in più
 
-Nulla: solo `template/.github/workflows/dev-agent.yml` è stato toccato, con le due modifiche richieste e i commenti che le spiegano.
+Nulla: solo i file nominati dalla issue (`init.sh`, `template/.fucina.yml`,
+`template/CLAUDE.md`, `README.md`).

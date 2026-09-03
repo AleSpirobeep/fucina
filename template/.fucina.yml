@@ -12,6 +12,32 @@ agente:
   max_budget_usd: 3.00
   max_iterazioni: 3
 
+# Configurazione del PM a cicli (workflow pm-agent.yml). Può mancare del tutto:
+# ha default sensati. Si accende con scripts/pm.ps1 avvia. Vedi contracts/fucina-yml.md.
+pm:
+  modello: "claude-sonnet-5"         # default: claude-sonnet-5
+  max_turns: 40                      # default: 40 (rivedere un diff costa meno che scriverlo)
+  max_budget_usd: 2.00               # default: 2.00
+  attesa_check_minuti: 15            # default: 15
+  titolo_rapporto: "Rapporto del PM" # default: "Rapporto del PM"
+  # Strumenti del PM: sola lettura più la scrittura del verdetto e degli ADR.
+  # MAI fondere, chiudere, etichettare, commentare, fare commit o push da qui:
+  # quegli effetti passano solo dal workflow (REQ-270).
+  strumenti_permessi:
+    - "Read"
+    - "Glob"
+    - "Grep"
+    - "Write"
+    - "Bash(gh pr view:*)"
+    - "Bash(gh pr diff:*)"
+    - "Bash(gh pr checks:*)"
+    - "Bash(gh issue view:*)"
+    - "Bash(gh run view:*)"
+    - "Bash(gh run list:*)"
+    - "Bash(git log:*)"
+    - "Bash(git show:*)"
+    - "Bash(node:*)"
+
 # Strumenti che l'agente può usare oltre a quelli di sola lettura.
 # ATTENZIONE: senza questa lista l'action concede solo Read/Glob/Grep/LS e
 # l'agente non può modificare file né eseguire i test. Vedi ADR 2026-09-02-0900.

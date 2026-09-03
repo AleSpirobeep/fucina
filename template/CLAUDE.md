@@ -14,7 +14,14 @@
 - `specs/` — cosa il progetto deve fare
 - `docs/decisions/` — perché è fatto così. **Non contraddire un ADR accettato:**
   se una decisione va cambiata, si scrive un ADR nuovo con `status: superseded by ...`
-- `.fucina.yml` — configurazione degli agenti
+- `.fucina.yml` — configurazione degli agenti, compreso il PM sotto la chiave `pm`
+
+## Il PM a cicli
+
+Il PM gira coi comandi `scripts/pm-coda.js` (sceglie il prossimo task dalla coda) e
+`scripts/pm.ps1 avvia|ferma|stato` (accende, spegne, mostra lo stato). L'issue con
+label `rapporto-pm` è il rapporto del PM ad Alessio: **non va mai presa in carico
+dall'agente sviluppatore**, nemmeno se etichettata `ready-for-dev` per errore.
 
 ## Definizione di "fatto"
 
