@@ -65,6 +65,9 @@
         creaStatoAggiornamento,
         avviaAggiornamento,
         terminaAggiornamento,
+        testoRispostaValido,
+        messaggioConfermaRisposta,
+        messaggioErroreFase,
       } from "./lib.js";
       import {
         issueAperte,
@@ -73,6 +76,8 @@
         commentiIssue,
         statoCheckPr,
         runWorkflow,
+        rispondiERiavvia,
+        ErroreFase,
       } from "./github.js";
 
       const CHIAVE_TOKEN = "fucina.token";
@@ -285,7 +290,52 @@
         renderAgentiAttivi(repos);
       }
 
-      function costruisciVoceIssueBloccata(issue, commento) {
+      function costruisciFormRispondiERiavvia(issue, repo) {
+        const contenitore = document.createElement("div");
+        const campo = document.createElement("textarea");
+        campo.rows = 3;
+        campo.placeholder = "Scrivi la risposta…";
+        const pulsante = document.createElement("button");
+        pulsante.type = "button";
+        pulsante.textContent = "Rispondi e riavvia";
+        pulsante.disabled = true;
+        const erroreRisposta = document.createElement("p");
+        erroreRisposta.setAttribute("role", "alert");
+
+        campo.addEventListener("input", () => {
+          pulsante.disabled = !testoRispostaValido(campo.value);
+        });
+
+        pulsante.addEventListener("click", async () => {
+          const testo = campo.value;
+          if (!testoRispostaValido(testo)) return;
+          if (!window.confirm(messaggioConfermaRisposta(issue, testo))) return;
+
+          erroreRisposta.textContent = "";
+          pulsante.disabled = true;
+          campo.disabled = true;
+
+          try {
+            await rispondiERiavvia(tokenSalvato(), repo, issue.number, testo);
+            campo.value = "";
+            await aggiorna();
+          } catch (fallimento) {
+            erroreRisposta.textContent =
+              fallimento instanceof ErroreFase
+                ? messaggioErroreFase(fallimento.fase, fallimento.causa.message)
+                : fallimento.message;
+            campo.disabled = false;
+            pulsante.disabled = !testoRispostaValido(campo.value);
+          }
+        });
+
+        contenitore.appendChild(campo);
+        contenitore.appendChild(pulsante);
+        contenitore.appendChild(erroreRisposta);
+        return contenitore;
+      }
+
+      function costruisciVoceIssueBloccata(issue, commento, repo) {
         const voce = document.createElement("li");
         const link = document.createElement("a");
         link.href = issue.html_url;
@@ -296,6 +346,7 @@
           p.textContent = commento;
           voce.appendChild(p);
         }
+        voce.appendChild(costruisciFormRispondiERiavvia(issue, repo));
         return voce;
       }
 
@@ -334,7 +385,7 @@
             const sezione = costruisciSezioneRepo(repo);
             const elenco = document.createElement("ul");
             for (const { issue, commento } of issueBloccate) {
-              elenco.appendChild(costruisciVoceIssueBloccata(issue, commento));
+              elenco.appendChild(costruisciVoceIssueBloccata(issue, commento, repo));
             }
             for (const { elemento, statoCheck } of prInRevisione) {
               elenco.appendChild(costruisciVocePrInRevisione(elemento, statoCheck));

@@ -134,6 +134,14 @@ export function urlRunWorkflow(repo) {
   return `${API_BASE}/repos/${repo}/actions/workflows/dev-agent.yml/runs?per_page=50`;
 }
 
+export function urlLabelIssue(repo, numero) {
+  return `${API_BASE}/repos/${repo}/issues/${numero}/labels`;
+}
+
+export function urlRimuoviLabelIssue(repo, numero, nomeLabel) {
+  return `${API_BASE}/repos/${repo}/issues/${numero}/labels/${encodeURIComponent(nomeLabel)}`;
+}
+
 export class ErroreGitHub extends Error {
   constructor(codice, messaggio) {
     super(messaggio);
@@ -145,6 +153,29 @@ export function messaggioErroreHttp(status, repo) {
   if (status === 401) return "Token non valido o scaduto.";
   if (status === 404) return `Il repository ${repo} non esiste o non è raggiungibile.`;
   return `Richiesta a GitHub fallita (codice ${status}).`;
+}
+
+// REQ-130/131: le tre chiamate di "Rispondi e riavvia", nell'ordine in cui vanno eseguite.
+export const FASE_COMMENTO = "commento";
+export const FASE_RIMUOVI_NEEDS_HUMAN = "rimuoviNeedsHuman";
+export const FASE_AGGIUNGI_READY_FOR_DEV = "aggiungiReadyForDev";
+
+const DESCRIZIONE_FASE = {
+  [FASE_COMMENTO]: "nel pubblicare il commento",
+  [FASE_RIMUOVI_NEEDS_HUMAN]: "nel togliere l'etichetta needs-human",
+  [FASE_AGGIUNGI_READY_FOR_DEV]: "nell'aggiungere l'etichetta ready-for-dev",
+};
+
+export function messaggioErroreFase(fase, messaggioOriginale) {
+  return `Errore ${DESCRIZIONE_FASE[fase] || fase}: ${messaggioOriginale}`;
+}
+
+export function testoRispostaValido(testo) {
+  return typeof testo === "string" && testo.trim().length > 0;
+}
+
+export function messaggioConfermaRisposta(issue, testo) {
+  return `Pubblicare questo commento su "${issue.title}" (#${issue.number}) e riavviare l'agente?\n\n${testo}`;
 }
 
 // Le run duplicano gli eventi (push, pull_request) sullo stesso commit: si aggregano tutte.
