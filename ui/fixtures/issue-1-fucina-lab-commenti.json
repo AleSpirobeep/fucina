@@ -1,0 +1,34 @@
+[
+  {
+    "user": { "login": "github-actions" },
+    "body": "<!-- fucina:tentativo -->Tentativo avviato: [run 33545200617](https://github.com/AleSpirobeep/fucina-lab/actions/runs/33545200617)"
+  },
+  {
+    "user": { "login": "claude" },
+    "body": "**Claude encountered an error after 2m 9s** —— [View job](https://github.com/AleSpirobeep/fucina-lab/actions/runs/33545200617)\n\n[...] (corpo non rilevante per questo test: solo l'ultimo commento conta)"
+  },
+  {
+    "user": { "login": "github-actions" },
+    "body": "Il run dell'agente è terminato con errore — possibile superamento del tetto di spesa o del numero di turni. [Log](https://github.com/AleSpirobeep/fucina-lab/actions/runs/33545200617)"
+  },
+  {
+    "user": { "login": "github-actions" },
+    "body": "<!-- fucina:tentativo -->Tentativo avviato: [run 33619692715](https://github.com/AleSpirobeep/fucina-lab/actions/runs/33619692715)"
+  },
+  {
+    "user": { "login": "claude" },
+    "body": "**Claude finished @AleSpirobeep's task in 2m 2s** —— [View job](https://github.com/AleSpirobeep/fucina-lab/actions/runs/33619692715) • [`fucina/issue-1-20260902-1029`](https://github.com/AleSpirobeep/fucina-lab/tree/fucina/issue-1-20260902-1029) • [Create PR ➔](https://github.com/AleSpirobeep/fucina-lab/compare/main...fucina/issue-1-20260902-1029?quick_pull=1)\n\n[...] (corpo non rilevante per questo test: solo l'ultimo commento conta)"
+  },
+  {
+    "user": { "login": "github-actions" },
+    "body": "<!-- fucina:tentativo -->Tentativo avviato: [run 33662923103](https://github.com/AleSpirobeep/fucina-lab/actions/runs/33662923103)"
+  },
+  {
+    "user": { "login": "github-actions" },
+    "body": "Il run dell'agente è terminato con errore — possibile superamento del tetto di spesa o del numero di turni. [Log](https://github.com/AleSpirobeep/fucina-lab/actions/runs/33662923103)"
+  },
+  {
+    "user": { "login": "github-actions" },
+    "body": "L'agente ha esaurito i 3 tentativi previsti senza chiudere la issue. Serve una persona: probabilmente la issue va riscritta o spezzata."
+  }
+]
