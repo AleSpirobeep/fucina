@@ -19,6 +19,9 @@ verificano, e non approva la propria PR.
 ## P4 — Il merge è umano
 Nessun merge automatico. È la valvola che separa una persona da un loop che gira
 nella direzione sbagliata per otto ore.
+Eccezione, per la sola spec 002: il merge è dell'agente PM, un'istanza distinta da
+quella che scrive il codice, che revisiona ogni diff e riferisce in una issue di
+rapporto — vedi `docs/decisions/2026-09-02-2100-pm-agent-fonde.md`.
 
 ## P5 — Ogni decisione presa senza chiedere lascia una traccia
 Se un agente decide qualcosa che la specifica non copre, scrive un ADR. Se non può
