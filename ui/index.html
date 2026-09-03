@@ -6,8 +6,98 @@
   </head>
   <body>
     <h1>Registro</h1>
+
+    <section id="configurazione" hidden>
+      <h2>Configurazione</h2>
+      <form id="formConfigurazione">
+        <div>
+          <label for="repoTesto">Repo (proprietario/nome, uno per riga)</label><br />
+          <textarea id="repoTesto" rows="6" cols="40"></textarea>
+        </div>
+        <div>
+          <label for="token">Token</label><br />
+          <input type="password" id="token" autocomplete="off" />
+        </div>
+        <p id="erroreConfigurazione" role="alert"></p>
+        <button type="submit">Salva</button>
+      </form>
+    </section>
+
+    <section id="dashboard" hidden>
+      <h2>Dashboard</h2>
+      <button id="apriConfigurazione">Configurazione</button>
+      <button id="dimenticaToken">Dimentica il token</button>
+    </section>
+
     <script type="module">
-      import "./lib.js";
+      import { validaElencoRepo, configurazioneValida } from "./lib.js";
+
+      const CHIAVE_TOKEN = "fucina.token";
+      const CHIAVE_REPO = "fucina.repoTesto";
+
+      const sezioneConfigurazione = document.getElementById("configurazione");
+      const sezioneDashboard = document.getElementById("dashboard");
+      const form = document.getElementById("formConfigurazione");
+      const campoRepo = document.getElementById("repoTesto");
+      const campoToken = document.getElementById("token");
+      const erroreConfigurazione = document.getElementById("erroreConfigurazione");
+
+      function tokenSalvato() {
+        return localStorage.getItem(CHIAVE_TOKEN) || "";
+      }
+
+      function mostraDashboard() {
+        sezioneConfigurazione.hidden = true;
+        sezioneDashboard.hidden = false;
+      }
+
+      function mostraConfigurazione() {
+        erroreConfigurazione.textContent = "";
+        campoRepo.value = localStorage.getItem(CHIAVE_REPO) || "";
+        campoToken.value = "";
+        campoToken.placeholder = tokenSalvato()
+          ? "lascia vuoto per non cambiare il token attuale"
+          : "Token personale di GitHub";
+        sezioneConfigurazione.hidden = false;
+        sezioneDashboard.hidden = true;
+      }
+
+      form.addEventListener("submit", (evento) => {
+        evento.preventDefault();
+
+        const repoTesto = campoRepo.value;
+        const validazioneRepo = validaElencoRepo(repoTesto);
+        if (!validazioneRepo.ok) {
+          erroreConfigurazione.textContent = validazioneRepo.errore;
+          return;
+        }
+
+        const tokenInserito = campoToken.value.trim();
+        const token = tokenInserito.length > 0 ? tokenInserito : tokenSalvato();
+        if (!configurazioneValida({ repoTesto, token })) {
+          erroreConfigurazione.textContent = "Inserisci un token.";
+          return;
+        }
+
+        localStorage.setItem(CHIAVE_REPO, repoTesto);
+        localStorage.setItem(CHIAVE_TOKEN, token);
+        mostraDashboard();
+      });
+
+      document
+        .getElementById("apriConfigurazione")
+        .addEventListener("click", mostraConfigurazione);
+
+      document.getElementById("dimenticaToken").addEventListener("click", () => {
+        localStorage.removeItem(CHIAVE_TOKEN);
+        mostraConfigurazione();
+      });
+
+      if (tokenSalvato()) {
+        mostraDashboard();
+      } else {
+        mostraConfigurazione();
+      }
     </script>
   </body>
 </html>

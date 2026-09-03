@@ -1,48 +1,39 @@
-Crea la cartella `ui/` con l'impalcatura minima richiesta dalla issue: `index.html`
-(pagina con titolo "Registro" che importa `lib.js` come modulo ES), `lib.js` (esporta
-`versione()` che restituisce `"0.1.0"`) e `lib.test.js` (test con `node:test` che la
-verifica).
+Implementa T2 della spec 002 (REQ-101, REQ-102, REQ-103): la configurazione iniziale
+del Registro (elenco repo e token in `localStorage`), con le due correzioni chieste
+dal PM dopo la revisione della PR #27.
 
-Closes #13.
+- `ui/lib.js`: nuove funzioni pure `parseElencoRepo`, `validaRepo`, `validaElencoRepo`,
+  `configurazioneValida`. `validaElencoRepo` rifiuta esplicitamente l'elenco vuoto e un
+  testo di sole righe vuote/spazi, restituendo `{ ok: false, repos: [], errore }`.
+- `ui/configurazione.test.js` (nuovo file, non ho toccato `ui/lib.test.js`): 13 test
+  per le nuove funzioni, inclusi i due casi di elenco vuoto richiesti dal PM.
+- `ui/index.html`: al primo avvio mostra il modulo di configurazione; dopo un
+  salvataggio valido (repo validi + token) mostra la dashboard; ai successivi avvii
+  parte dalla dashboard perché la condizione è la presenza del token in
+  `localStorage`. Un elenco repo vuoto o di sole righe vuote non salva nulla e mostra
+  "Inserisci almeno un repo." in italiano. Il pulsante "Configurazione" riapre il
+  modulo, "Dimentica il token" cancella solo il token e torna al modulo. Il campo
+  token non è mai precompilato (vedi ADR) e il suo segnaposto è calcolato ogni volta
+  che il modulo si apre: con un token già salvato invita a lasciarlo vuoto per non
+  cambiarlo, senza token dice solo "Token personale di GitHub". Il token non è mai
+  scritto in `console.log` né in `innerHTML`.
 
-**Come l'ho verificato:** `node --test "ui/**/*.test.js"` e `node --test` (senza
-argomenti, che fa la scansione automatica della directory corrente) escono entrambi
-verdi. Vedi però la nota sotto: il comando letterale `node --test ui/` fallisce in
-questo ambiente per un motivo che non riguarda questi file.
+Verificato con `node --test "ui/**/*.test.js"`: 14/14 verdi (13 nuovi + 1 esistente).
+
+Closes #14
 
 ## Decisioni
-
-Nessun ADR aggiunto: nessuna delle scelte di questo task era mia da prendere, ho
-seguito alla lettera il testo della issue.
-
-**Attenzione — possibile problema di ambiente sul comando dei test:** nel sandbox in
-cui ho lavorato, il comando letterale `node --test ui/` (quello indicato in
-`.fucina.yml` alla chiave `test_command`, e usato in `.github/workflows/ci.yml`)
-fallisce con `Cannot find module '.../ui'` invece di eseguire i test. Ho verificato che
-non è un problema del codice appena scritto: la stessa identica eccezione compare
-passando *qualsiasi* directory come argomento posizionale a `node --test`, comprese
-directory vuote e una chiamata letteralmente `test/` — sembra che in questa build di
-Node (`v22.23.2`) il runner non faccia la scansione ricorsiva quando riceve un
-argomento-directory nudo, solo quando non riceve argomenti (scansione automatica dalla
-cwd) o quando riceve un pattern glob esplicito come `"ui/**/*.test.js"`. Entrambe
-queste alternative, sullo stesso codice, escono verdi.
-
-Non ho toccato `.fucina.yml` né `.github/workflows/ci.yml` per non uscire dal
-perimetro della issue (e perché `ci.yml` è comunque un percorso protetto). Chi
-revisiona dovrebbe verificare se lo stesso comando fallisce anche sul runner reale di
-GitHub Actions (la versione di Node lì potrebbe differire da quella del sandbox) prima
-di dare per buono il check CI di questa PR: se fallisce anche lì, serve un intervento
-umano su `ci.yml` (fuori dal mio perimetro) o una decisione su come cambiare
-`test_command` in `.fucina.yml`.
+- [`docs/decisions/2026-09-03-1105-token-mai-precompilato.md`](../docs/decisions/2026-09-03-1105-token-mai-precompilato.md):
+  il campo token nel modulo non è mai precompilato con il valore salvato, per
+  rispettare alla lettera "il token non compare mai nell'HTML"; vuoto al salvataggio
+  = mantieni il token attuale; il segnaposto riflette la presenza effettiva del
+  token al momento in cui il modulo si apre, così resta corretto anche subito dopo
+  "Dimentica il token".
 
 ## Non fatto
-
-Nulla di quanto chiesto dalla issue: i tre file esistono con esattamente il contenuto
-richiesto e i criteri di accettazione su struttura/contenuto sono soddisfatti. L'unico
-punto aperto è la nota sopra sul comando `node --test ui/`, che è una scoperta
-sull'ambiente, non un requisito lasciato incompleto.
+Nulla dei criteri di T2, inclusi i due punti aggiuntivi del PM. REQ-110 e successivi
+(coda, avanzamento, comando) sono fuori dal perimetro di questa issue.
 
 ## Fatto in più
-
-Nulla: solo i tre file richiesti dalla issue (`ui/index.html`, `ui/lib.js`,
-`ui/lib.test.js`) e questo `.fucina/pr-body.md`.
+Nulla oltre ai file necessari: `ui/lib.js`, `ui/configurazione.test.js`,
+`ui/index.html`, l'ADR e questo file.
