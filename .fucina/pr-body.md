@@ -1,70 +1,70 @@
-## Cosa ho fatto
+Completa `template/.github/workflows/pm-agent.yml` con i passi 8–10 di `plan.md`: la
+chiamata al modello (`anthropics/claude-code-action@v1`) e l'esecuzione del verdetto
+secondo `contracts/verdetto.md`.
 
-Nel passo «Azione: attendi-check» di `template/.github/workflows/pm-agent.yml`, reso
-tollerante al fallimento il conteggio dei check letto dopo che `gh pr checks --watch`
-esce con un codice diverso da 0 e da 124:
+- Passo **«Esegui il PM»**: gira solo quando `steps.modalita.outputs.modalita == 'modello'`,
+  cioè esattamente `workflow_dispatch` con `azione` diversa da `scansione` (REQ-220, 230,
+  calcolato dal passo esistente "Determina la modalità"). `claude_code_oauth_token`;
+  `env` con `ANTHROPIC_BASE_URL` da `endpoint` e `GH_TOKEN: secrets.GITHUB_TOKEN` (sola
+  lettura: il PAT non arriva mai al modello); `track_progress: false`; prompt `/pm-agent`
+  + «Revisiona la PR #N» / «Rispondi alla issue #N» (calcolato nel passo "Decidi la
+  prossima azione", nuovo output `richiesta`) + `CARTELLA_FUCINA=$RUNNER_TEMP/fucina`
+  (creata da un passo precedente, con `decisioni/`); `claude_args` con `--model`,
+  `--max-turns`, `--max-budget-usd` da `pm.*` e `--allowedTools "<elenco>"` tra virgolette.
+- Passo **«Leggi il verdetto»**: legge `verdetto.json` con `jq`; assente, non valido,
+  `versione` ≠ 1, numero diverso da quello richiesto, o esito non ammesso per il tipo
+  (dedotto dal contesto della richiesta, non dal campo `oggetto.tipo` del file — vedi ADR)
+  → esito `umano` con il commento standard «Il PM non ha concluso: \<causa\>. Log: \<link\>»
+  (REQ-222).
+- Passo **«Pubblica gli ADR del PM»**: per ogni file in `decisioni/`, copia in
+  `docs/decisions/`, `git add`, commit «ADR del PM: \<nome\>», push su `main` (ramo di
+  default) con il PAT; se il push fallisce il verdetto viene eseguito comunque e il
+  commento sul rapporto lo segnala (REQ-234).
+- Un passo per ogni esito della tabella di `contracts/verdetto.md`: `fondi` → merge
+  squash + delete-branch, su errore `+needs-human` sulla PR con l'errore (REQ-223);
+  `rimanda` → commento, chiusura della PR, stesso commento sull'issue collegata (`Closes #`
+  nel corpo), `+ready-for-dev` (REQ-224); `rispondi` → commento, `-needs-human
+  +ready-for-dev` (REQ-231); `umano` → commento con `<!-- fucina:pm-umano -->` in coda,
+  `+needs-human` solo se PR (REQ-232); `riscrivi` → una issue `in-coda` per ogni
+  `nuove_issue`, commento e chiusura dell'originale (REQ-233).
+- Passo **«Commenta il rapporto (modello)»**: esito, motivo, link, ed eventuale errore di
+  push degli ADR (REQ-241).
+- Passo **«Rilancia se resta lavoro (dopo il verdetto)»**: rilegge lo stato e rilancia una
+  scansione solo se `pm-coda.js` trova ancora lavoro (REQ-205), stesso schema del passo
+  analogo già esistente per la modalità `scansione`.
+- Il passo di fallimento esistente («Segnala il fallimento del run», `if: failure()`) copre
+  già anche questi passi nuovi: nessuna modifica necessaria.
 
-```diff
--CONTEGGIO=$(gh pr checks "$NUMERO" --json bucket --jq 'length')
-+CONTEGGIO=$(gh pr checks "$NUMERO" --json bucket --jq 'length' 2>/dev/null || echo 0)
-```
+## Verificato
 
-`gh pr checks --json` esce non-zero (senza stampare nulla) proprio quando la PR non ha
-ancora nessun check registrato — `populateStatusChecks`, nel sorgente di `gh`,
-restituisce l'errore `no checks reported on the '<branch>' branch` prima di raggiungere
-l'exporter JSON — oltre che per un eventuale errore di rete transitorio. Sotto
-`set -euo pipefail` quell'uscita non-zero faceva morire il passo prima di raggiungere
-il tetto di `pm.attesa_check_minuti`, e l'intera esecuzione del PM falliva con il
-commento «Esecuzione fallita» sul rapporto: il ramo `nessun-check` (REQ-215) non era
-mai raggiungibile. Ora un fallimento vale 0 check visti in questo giro, esattamente
-come fa già `raccogli-stato.sh` per la stessa chiamata (`2>/dev/null || echo '[]'`), e
-il ciclo prosegue a ritentare finché non compare un check o scade il tetto.
-
-Aggiunto solo un commento che spiega la correzione, accanto alla riga cambiata.
-
-## Come l'ho verificato
-
-```
-$ yq '.' template/.github/workflows/pm-agent.yml
-```
-Esce con codice 0 (YAML valido); l'output completo è nell'ultimo aggiornamento del
-commento di lavorazione su questa issue.
-
-Per verificare che il ramo `nessun-check` sia ora raggiungibile senza poter invocare
-`gh` vero (fuori dagli strumenti permessi in questa sessione), ho riprodotto in Node.js
-la logica del ciclo — stessi tre esiti possibili, `gh pr checks --watch` e
-`gh pr checks --json` sostituiti da mock — e forzato lo scenario del difetto: `--watch`
-esce sempre 1 (nessun check ancora) **e** la lettura `--json` fallisce sempre (come
-davanti a una PR senza check). Con la guardia il ciclo arriva a `nessun-check` una volta
-scaduto il tetto; senza guardia la stessa chiamata lancia un'eccezione non gestita, che
-è l'equivalente diretto del `set -e` che uccideva il passo. Ho verificato allo stesso
-modo che gli altri due esiti (`conclusi` con `--watch` che esce 0, `tetto-superato` con
-`--watch` che esce 124) restano raggiungibili e non vengono toccati dalla correzione.
-
-```
-$ node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"
-# tests 150
-# pass 150
-# fail 0
-```
-Nessun test nuovo: la correzione è una riga di bash dentro un passo YAML, non una
-funzione JavaScript pura esportata — non c'è logica da coprire con `node:test` che non
-sia già coperta dalla suite esistente (invariata).
+- `yq '.' template/.github/workflows/pm-agent.yml` esce 0.
+- Nessuna stringa `--admin` nel file; il modello riceve solo `secrets.GITHUB_TOKEN`
+  (mai il PAT); `--allowedTools` è tra virgolette.
+- `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` → 150/150 verdi (nessun
+  file toccato da questo task ha test propri: è un workflow, verificato con `yq` e lettura,
+  non con `node --test`, come previsto da `tasks.md`).
 
 ## Decisioni
 
-Nulla: la correzione applica alla lettera il comando indicato dalla issue
-(`2>/dev/null || echo '[]'`, adattato a `echo 0` perché qui serve un intero da
-confrontare con `-gt 0`, non una lista JSON), che è già in uso nel repo per la stessa
-identica chiamata. Nessuna scelta libera, nessun ADR.
+- `docs/decisions/2026-09-03-1739-dettagli-esecuzione-verdetto.md`: da dove viene il "tipo"
+  usato per validare `esito` (dal contesto della richiesta, non dal campo `oggetto.tipo`
+  scritto dal modello) e perché l'estrazione di `Closes #` dal corpo della PR è
+  reimplementata in bash invece di essere esportata da `pm-coda.js` (T003 tocca solo il
+  workflow).
 
 ## Non fatto
 
-Nulla: la issue chiedeva una correzione di una riga (più il commento che la spiega) e
-il diff tocca solo quello.
+- Nessun collaudo end-to-end reale del passo «Esegui il PM» (richiede l'action, i secret e
+  un repo installato: fuori portata di questo ambiente). La verifica è statica (`yq`,
+  lettura del file, corrispondenza con `contracts/verdetto.md` e `plan.md`).
+- Non ho toccato `plugin/skills/pm-agent/SKILL.md` (riscrittura del ruolo): è T004, un altro
+  task.
 
 ## Fatto in più
 
-Nulla: nessun file oltre a `template/.github/workflows/pm-agent.yml` è stato toccato.
+Nulla oltre a `template/.github/workflows/pm-agent.yml`: ho aggiunto l'output `richiesta`
+al passo esistente "Decidi la prossima azione" (necessario per comporre il prompt del
+passo «Esegui il PM») e aggiornato il commento in testa al file, che citava ancora il
+segnaposto di T002.
 
-Closes #55
+Closes #45
