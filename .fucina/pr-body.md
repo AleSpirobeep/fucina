@@ -67,16 +67,48 @@ corregge i cinque punti della revisione:
    ora passano da `env:` invece di essere interpolati nello script bash, come già
    per gli altri valori del file.
 
+### Revisione del tentativo 2 (PR #53, chiusa)
+
+Questo tentativo riparte dal lavoro del tentativo 2 (fast-forward sul suo ultimo
+commit) e corregge **un solo punto**, come richiesto: tutto il resto — compreso
+`raccogli-stato.sh`, verificato dal PM eseguendolo con un `gh` finto — resta
+identico.
+
+**Il difetto.** Nel passo "Azione: attendi-check", `gh pr checks --watch` esce con
+codice **1 in due situazioni diverse**: quando non risulta nessun check, e — molto
+più spesso — quando i check si sono conclusi e almeno uno è fallito (nel sorgente di
+`gh`: `SilentError` appena `Failed > 0`). Il ramo `else` del tentativo 2 trattava
+entrambe come "nessun check", mandando la PR a `needs-human` con un messaggio che
+descriveva una causa diversa da quella vera — e nel caso più comune (check che
+finiscono con un rosso) impediva a `rimanda-check-rossi` di essere mai raggiunto,
+perché il rilancio successivo trovava la PR con `needs-review` **e** `needs-human`
+e la scartava.
+
+**La correzione.** Il passo ora usa un fatto osservabile invece del codice
+d'uscita: dopo che `gh pr checks --watch` esce con un codice diverso da 0 e da 124,
+interroga `gh pr checks --json bucket --jq 'length'` (esce sempre 0). Lista non
+vuota → i check sono conclusi (verdi o rossi): non fa nulla, il rilancio successivo
+rilegge lo stato e arriva a `rimanda-check-rossi` o a `revisione`. Lista vuota →
+davvero nessun check registrato: **non** passa subito a `needs-human` (sarebbe
+troppo severo, perché appena aperta una PR i check impiegano qualche secondo a
+comparire), ma ripete l'attesa finché non ne compare uno o scade il tetto
+`pm.attesa_check_minuti` — lo stesso tetto che copre già i check lenti, ora esteso a
+coprire anche quelli che non compaiono (REQ-215). Il commento sul rapporto per
+`attendi-check` (passo "Commenta il rapporto") distingue di conseguenza i tre esiti:
+conclusi, tetto superato con check ancora in sospeso, tetto superato senza alcun
+check registrato.
+
 ## Come l'ho verificato
 
 ```
 $ yq '.' template/.github/workflows/pm-agent.yml
 ```
-Esce con codice 0 (YAML valido) — l'output completo (369 → ora più righe per i rami
-aggiunti) è stato controllato a mano contro `plan.md` e i contratti, e le sette
-occorrenze di `gh ... --jq` più le due nuove in `raccogli-stato.sh` sono state rilette
-isolate dal contesto YAML per controllare che ogni flag esista e stia dove deve —
-compreso il punto bloccante del tentativo 1.
+Esce con codice 0 (YAML valido) in questo tentativo come nei precedenti. Rilette
+isolate dal contesto YAML tutte le invocazioni `gh ... --json/--jq` dei due file
+(comprese le due nuove nel passo "Azione: attendi-check": `gh pr checks --json
+bucket --jq 'length'` sulla riga dopo `--watch`, che riusa lo stesso schema già
+verificato alla riga 31 di `raccogli-stato.sh`) per controllare che ogni flag esista
+e stia dove deve.
 
 ```
 $ grep -n -- "--admin" template/.github/workflows/pm-agent.yml
@@ -138,6 +170,11 @@ toccano solo YAML/bash.
   decisione libera: `plan.md` lo copre già esplicitamente, come segnalato nella
   revisione del tentativo 1. È stato tolto dall'ADR e implementato secondo la
   specifica (vedi sopra, punto 2).
+- Nessun nuovo ADR in questo tentativo: la correzione di "Azione: attendi-check"
+  (vedi "Revisione del tentativo 2" sopra) non è una scelta libera — REQ-215 dice
+  esplicitamente che il tetto copre l'attesa dei check, e la revisione ha dettato il
+  fatto osservabile da usare (`gh pr checks --json bucket`) per distinguerne gli
+  esiti.
 
 ## Non fatto
 

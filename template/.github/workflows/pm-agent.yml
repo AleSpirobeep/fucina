@@ -196,30 +196,60 @@ jobs:
           MINUTI: ${{ steps.cfg.outputs.attesa_check }}
         run: |
           set -euo pipefail
-          # `gh pr checks --watch` esce subito, senza aspettare, se sulla PR non
-          # risulta ancora nessun check: quell'uscita non è il timeout (124) e va
-          # distinta, altrimenti il tetto di REQ-215 non scatterebbe mai e ogni
-          # rilancio richiamerebbe questa azione a vuoto.
-          set +e
-          timeout "${MINUTI}m" gh pr checks "$NUMERO" --watch
-          ESITO=$?
-          set -e
-          if [ "$ESITO" -eq 0 ]; then
-            echo "Check della PR #$NUMERO conclusi entro il tetto di ${MINUTI} minuti."
-            echo "esito=conclusi" >> "$GITHUB_OUTPUT"
-          elif [ "$ESITO" -eq 124 ]; then
-            echo "::warning::Check della PR #$NUMERO non conclusi entro ${MINUTI} minuti: passo needs-human."
-            gh pr edit "$NUMERO" --add-label needs-human
-            gh pr comment "$NUMERO" --body \
-              "<!-- fucina:pm-umano -->I check non si sono conclusi entro il tetto di ${MINUTI} minuti. Verifica lo stato dei check e togli \`needs-human\` quando sono pronti."
-            echo "esito=tetto-superato" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::gh pr checks --watch sulla PR #$NUMERO è uscito subito (esito $ESITO): nessun check risulta registrato."
-            gh pr edit "$NUMERO" --add-label needs-human
-            gh pr comment "$NUMERO" --body \
-              "<!-- fucina:pm-umano -->Non risulta nessun check registrato sulla PR. Verifica che i controlli richiesti siano configurati e togli \`needs-human\` quando lo sono."
-            echo "esito=nessun-check" >> "$GITHUB_OUTPUT"
-          fi
+          # `gh pr checks --watch` esce 1 tanto quando sulla PR non risulta ancora
+          # nessun check (comune appena aperta: i check impiegano qualche secondo a
+          # comparire) quanto quando i check sono conclusi e almeno uno è fallito
+          # (nel sorgente di gh: SilentError appena Failed > 0). Il codice d'uscita
+          # da solo non distingue i due casi: dopo un'uscita diversa da 0 e da 124
+          # si interroga `gh pr checks --json bucket` (esce sempre 0) per il fatto
+          # osservabile. Lista non vuota vale "conclusi" (verdi o rossi, li smista
+          # la prossima scansione); lista vuota vale "nessun check" e si ritenta
+          # finché non ne compare uno o scade il tetto, che deve coprire tanto i
+          # check lenti quanto quelli che non compaiono ancora (REQ-215).
+          SCADENZA=$(( $(date +%s) + MINUTI * 60 ))
+          ESITO=""
+          while [ -z "$ESITO" ]; do
+            RESTANTI=$(( SCADENZA - $(date +%s) ))
+            if [ "$RESTANTI" -le 0 ]; then
+              ESITO="nessun-check"
+              break
+            fi
+            set +e
+            timeout "${RESTANTI}s" gh pr checks "$NUMERO" --watch
+            WESITO=$?
+            set -e
+            if [ "$WESITO" -eq 0 ]; then
+              ESITO="conclusi"
+            elif [ "$WESITO" -eq 124 ]; then
+              ESITO="tetto-superato"
+            else
+              CONTEGGIO=$(gh pr checks "$NUMERO" --json bucket --jq 'length')
+              if [ "$CONTEGGIO" -gt 0 ]; then
+                ESITO="conclusi"
+              else
+                sleep 5
+              fi
+            fi
+          done
+
+          case "$ESITO" in
+            conclusi)
+              echo "Check della PR #$NUMERO conclusi entro il tetto di ${MINUTI} minuti."
+              ;;
+            tetto-superato)
+              echo "::warning::Check della PR #$NUMERO non conclusi entro ${MINUTI} minuti: passo needs-human."
+              gh pr edit "$NUMERO" --add-label needs-human
+              gh pr comment "$NUMERO" --body \
+                "<!-- fucina:pm-umano -->I check non si sono conclusi entro il tetto di ${MINUTI} minuti. Verifica lo stato dei check e togli \`needs-human\` quando sono pronti."
+              ;;
+            nessun-check)
+              echo "::warning::Nessun check risulta registrato sulla PR #$NUMERO entro il tetto di ${MINUTI} minuti."
+              gh pr edit "$NUMERO" --add-label needs-human
+              gh pr comment "$NUMERO" --body \
+                "<!-- fucina:pm-umano -->Non risulta nessun check registrato sulla PR entro il tetto di ${MINUTI} minuti. Verifica che i controlli richiesti siano configurati e togli \`needs-human\` quando lo sono."
+              ;;
+          esac
+          echo "esito=$ESITO" >> "$GITHUB_OUTPUT"
 
       - name: "Azione: rimanda-check-rossi"
         if: steps.modalita.outputs.modalita == 'scansione' && steps.decisione.outputs.azione == 'rimanda-check-rossi'
@@ -310,7 +340,7 @@ jobs:
           if [ "$AZIONE" = "attendi-check" ]; then
             case "$ESITO_ATTESA" in
               tetto-superato) MOTIVO="i check non si sono conclusi entro il tetto di attesa: PR passata a needs-human" ;;
-              nessun-check) MOTIVO="nessun check risultava registrato sulla PR: PR passata a needs-human" ;;
+              nessun-check) MOTIVO="nessun check risultava registrato sulla PR entro il tetto di attesa: PR passata a needs-human" ;;
               *) MOTIVO="i check si sono conclusi entro il tetto di attesa" ;;
             esac
           fi
