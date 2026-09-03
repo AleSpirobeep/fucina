@@ -169,3 +169,32 @@ export function tabellaAvanzamento(classificazione) {
     return { chiave, etichetta, conteggio: elementi.length, elementi };
   });
 }
+
+const STATI_RUN_ATTIVI = new Set(["in_progress", "queued"]);
+
+export function agentiAttivi(runs) {
+  return (runs || [])
+    .filter((run) => STATI_RUN_ATTIVI.has(run.status))
+    .map((run) => ({
+      titolo: run.display_title,
+      url: run.html_url,
+      avviatoA: run.run_started_at,
+    }));
+}
+
+const MS_AL_MINUTO = 60 * 1000;
+const MINUTI_ALL_ORA = 60;
+
+export function formattaTempoTrascorso(avviatoA, adesso) {
+  const minuti = Math.max(
+    0,
+    Math.floor((new Date(adesso).getTime() - new Date(avviatoA).getTime()) / MS_AL_MINUTO),
+  );
+
+  if (minuti < 1) return "meno di 1 min";
+  if (minuti < MINUTI_ALL_ORA) return `${minuti} min`;
+
+  const ore = Math.floor(minuti / MINUTI_ALL_ORA);
+  const minutiResto = minuti % MINUTI_ALL_ORA;
+  return minutiResto === 0 ? `${ore} h` : `${ore} h ${minutiResto} min`;
+}
