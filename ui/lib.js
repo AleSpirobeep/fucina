@@ -34,3 +34,36 @@ export function validaElencoRepo(testo) {
 export function configurazioneValida({ repoTesto, token }) {
   return validaElencoRepo(repoTesto).ok && typeof token === "string" && token.trim().length > 0;
 }
+
+const INTESTAZIONI_SEZIONI = {
+  "non fatto": "nonFatto",
+  "fatto in più": "fattoInPiu",
+  decisioni: "decisioni",
+};
+
+export function estraiSezioni(corpo) {
+  const risultato = { nonFatto: null, fattoInPiu: null, decisioni: null };
+  const testo = corpo || "";
+
+  const regexIntestazione = /^##[ \t]+(.+?)[ \t]*$/gm;
+  const intestazioni = [];
+  let corrispondenza;
+  while ((corrispondenza = regexIntestazione.exec(testo)) !== null) {
+    intestazioni.push({
+      titolo: corrispondenza[1].trim().toLowerCase(),
+      inizio: corrispondenza.index,
+      fine: regexIntestazione.lastIndex,
+    });
+  }
+
+  intestazioni.forEach((intestazione, indice) => {
+    const chiave = INTESTAZIONI_SEZIONI[intestazione.titolo];
+    if (!chiave) {
+      return;
+    }
+    const fineSezione = indice + 1 < intestazioni.length ? intestazioni[indice + 1].inizio : testo.length;
+    risultato[chiave] = testo.slice(intestazione.fine, fineSezione).trim();
+  });
+
+  return risultato;
+}

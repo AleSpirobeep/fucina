@@ -1,39 +1,39 @@
-Implementa T2 della spec 002 (REQ-101, REQ-102, REQ-103): la configurazione iniziale
-del Registro (elenco repo e token in `localStorage`), con le due correzioni chieste
-dal PM dopo la revisione della PR #27.
+Implementa T3 della spec 002 (REQ-110 parte, REQ-141): la funzione pura
+`estraiSezioni(corpo)` in `ui/lib.js`, che dato il corpo markdown di una PR
+restituisce `{ nonFatto, fattoInPiu, decisioni }` — il testo di ciascuna
+sezione `## Non fatto`, `## Fatto in più`, `## Decisioni`, in qualsiasi
+ordine, o `null` se l'intestazione non compare. Una sezione presente ma con
+solo "Nulla" come contenuto restituisce la stringa `"Nulla"`, non `null`.
+Le intestazioni di livello 3 o più dentro una sezione non la spezzano: solo
+un'altra intestazione `##` chiude la sezione corrente.
 
-- `ui/lib.js`: nuove funzioni pure `parseElencoRepo`, `validaRepo`, `validaElencoRepo`,
-  `configurazioneValida`. `validaElencoRepo` rifiuta esplicitamente l'elenco vuoto e un
-  testo di sole righe vuote/spazi, restituendo `{ ok: false, repos: [], errore }`.
-- `ui/configurazione.test.js` (nuovo file, non ho toccato `ui/lib.test.js`): 13 test
-  per le nuove funzioni, inclusi i due casi di elenco vuoto richiesti dal PM.
-- `ui/index.html`: al primo avvio mostra il modulo di configurazione; dopo un
-  salvataggio valido (repo validi + token) mostra la dashboard; ai successivi avvii
-  parte dalla dashboard perché la condizione è la presenza del token in
-  `localStorage`. Un elenco repo vuoto o di sole righe vuote non salva nulla e mostra
-  "Inserisci almeno un repo." in italiano. Il pulsante "Configurazione" riapre il
-  modulo, "Dimentica il token" cancella solo il token e torna al modulo. Il campo
-  token non è mai precompilato (vedi ADR) e il suo segnaposto è calcolato ogni volta
-  che il modulo si apre: con un token già salvato invita a lasciarlo vuoto per non
-  cambiarlo, senza token dice solo "Token personale di GitHub". Il token non è mai
-  scritto in `console.log` né in `innerHTML`.
+`ui/estraiSezioni.test.js` (nuovo file, non ho toccato `ui/lib.test.js` né
+`ui/configurazione.test.js`): 7 test, incluso un corpo senza sezioni e uno
+con una sezione vuota ("Nulla").
 
-Verificato con `node --test "ui/**/*.test.js"`: 14/14 verdi (13 nuovi + 1 esistente).
+Verificato con `node --test "ui/**/*.test.js"`: 21/21 verdi (7 nuovi + 14
+esistenti).
 
-Closes #14
+Closes #15
 
 ## Decisioni
-- [`docs/decisions/2026-09-03-1105-token-mai-precompilato.md`](../docs/decisions/2026-09-03-1105-token-mai-precompilato.md):
-  il campo token nel modulo non è mai precompilato con il valore salvato, per
-  rispettare alla lettera "il token non compare mai nell'HTML"; vuoto al salvataggio
-  = mantieni il token attuale; il segnaposto riflette la presenza effettiva del
-  token al momento in cui il modulo si apre, così resta corretto anche subito dopo
-  "Dimentica il token".
+Nulla: la forma della funzione (oggetto con tre chiavi, `null` per le
+sezioni assenti, riconoscimento in qualsiasi ordine) è quella descritta
+dalla issue, nessuna scelta di implementazione lasciata aperta da un ADR.
 
 ## Non fatto
-Nulla dei criteri di T2, inclusi i due punti aggiuntivi del PM. REQ-110 e successivi
-(coda, avanzamento, comando) sono fuori dal perimetro di questa issue.
+Non sono riuscita a recuperare i corpi reali delle PR #6 e #9 di
+`fucina-lab` richiesti dal criterio di accettazione: in questa sessione
+`gh` e l'accesso di rete diretto (curl, WebFetch) sono bloccati senza
+approvazione, e non c'è un umano che possa concederla durante il run.
+Ho testato la funzione su due corpi ricostruiti nella stessa forma imposta
+dal ruolo dev-agent (titolo, corpo, sezioni Decisioni/Non fatto/Fatto in
+più in ordine diverso fra loro) — vedi il commento in cima a
+`ui/estraiSezioni.test.js` — oltre a un corpo senza sezioni, una sezione
+vuota ("Nulla"), intestazioni in ordine sparso e un'intestazione di
+livello 3 dentro una sezione. Se questi due corpi reali sono importanti da
+avere per REQ-110 (coda "Aspettano te"), servirà un run con accesso a `gh`
+o incollarli direttamente nella issue.
 
 ## Fatto in più
-Nulla oltre ai file necessari: `ui/lib.js`, `ui/configurazione.test.js`,
-`ui/index.html`, l'ADR e questo file.
+Nulla oltre a `ui/lib.js`, `ui/estraiSezioni.test.js` e questo file.
