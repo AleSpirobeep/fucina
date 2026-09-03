@@ -80,6 +80,8 @@ copia "$TEMPLATE/scripts/pm-coda.js"                 "scripts/pm-coda.js"
 copia "$TEMPLATE/scripts/raccogli-stato.sh"          "scripts/raccogli-stato.sh"
 copia "$TEMPLATE/scripts/pm.ps1"                     "scripts/pm.ps1"
 copia "$FUCINA_DIR/plugin/skills/pm-agent/SKILL.md"  ".claude/skills/pm-agent/SKILL.md"
+copia "$TEMPLATE/scripts/analista-cancello.js"       "scripts/analista-cancello.js"
+copia "$FUCINA_DIR/plugin/skills/analista/SKILL.md"  ".claude/skills/analista/SKILL.md"
 echo
 
 # CODEOWNERS con l'utente giusto, solo se l'abbiamo appena creato
@@ -99,7 +101,7 @@ fi
 # --- passi manuali -----------------------------------------------------------
 
 cat <<FINE
-$(giallo "Restano cinque cose che init non può fare al posto tuo:")
+$(giallo "Restano sei cose che init non può fare al posto tuo:")
 
   1. Installa la GitHub App di Claude su questo repo:
      https://github.com/apps/claude
@@ -123,7 +125,11 @@ $(giallo "Restano cinque cose che init non può fare al posto tuo:")
      e non puoi approvare le tue PR: il cancello è il merge manuale),
      enforce_admins false. Nessun auto-merge, nessun bypass per gli agenti.
 
-  5. Il PM (workflow pm-agent.yml) è installato spento. Il login gh locale deve
+  5. L'analista non ha nulla da accendere: è la skill /analista in una sessione
+     Claude Code aperta su questo repo. Porta un'idea fino alle issue "in-coda" e
+     si ferma lì — le issue le crea con /analista consegna, e il PM lo accendi tu.
+
+  6. Il PM (workflow pm-agent.yml) è installato spento. Il login gh locale deve
      avere lo scope "workflow" per poterlo accendere: se manca, esegui
        gh auth refresh -s workflow
      Per accenderlo: scripts/pm.ps1 avvia (spegnerlo: scripts/pm.ps1 ferma).

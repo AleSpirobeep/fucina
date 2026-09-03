@@ -1,0 +1,10 @@
+version: 1
+
+setup_command: ""
+test_command: 'node --test "luce/**/*.test.js"'
+
+percorsi_protetti:
+  - "luce/*.test.js"
+  - ".github/workflows/**"
+
+secret_auth: "CLAUDE_CODE_OAUTH_TOKEN"
