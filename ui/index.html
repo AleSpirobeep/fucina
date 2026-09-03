@@ -5,9 +5,104 @@
     <title>Registro</title>
   </head>
   <body>
-    <h1>Registro</h1>
+    <div id="app"></div>
     <script type="module">
-      import "./lib.js";
+      import { validaElencoRepo, configurazioneValida } from "./lib.js";
+
+      const CHIAVE_REPO = "fucina-registro-repo";
+      const CHIAVE_TOKEN = "fucina-registro-token";
+
+      const app = document.getElementById("app");
+
+      function leggiConfigurazione() {
+        return {
+          repoTesto: localStorage.getItem(CHIAVE_REPO) ?? "",
+          token: localStorage.getItem(CHIAVE_TOKEN) ?? "",
+        };
+      }
+
+      function renderModulo(repoTestoPrecompilato) {
+        app.innerHTML = `
+          <h1>Registro</h1>
+          <form id="configurazione">
+            <p>
+              <label for="repos">Repo (uno per riga, formato proprietario/nome)</label><br />
+              <textarea id="repos" rows="8" cols="50"></textarea>
+            </p>
+            <p>
+              <label for="token">Token</label><br />
+              <input
+                id="token"
+                type="password"
+                autocomplete="off"
+                placeholder="lascia vuoto per non cambiare il token attuale"
+              />
+            </p>
+            <button type="submit">Salva</button>
+            <p id="errore" role="alert"></p>
+          </form>
+        `;
+        document.getElementById("repos").value = repoTestoPrecompilato ?? "";
+        document
+          .getElementById("configurazione")
+          .addEventListener("submit", (evento) => {
+            evento.preventDefault();
+            salva();
+          });
+      }
+
+      function salva() {
+        const erroreEl = document.getElementById("errore");
+        const repoTesto = document.getElementById("repos").value;
+        const tokenInserito = document.getElementById("token").value;
+
+        const risultato = validaElencoRepo(repoTesto);
+        if (!risultato.ok) {
+          erroreEl.textContent = `Righe non valide (atteso proprietario/nome): ${risultato.nonValide.join(", ")}`;
+          return;
+        }
+
+        const token = tokenInserito || (localStorage.getItem(CHIAVE_TOKEN) ?? "");
+        if (!token) {
+          erroreEl.textContent = "Inserisci un token.";
+          return;
+        }
+
+        localStorage.setItem(CHIAVE_REPO, repoTesto);
+        localStorage.setItem(CHIAVE_TOKEN, token);
+        renderDashboard();
+      }
+
+      function renderDashboard() {
+        app.innerHTML = `
+          <h1>Registro</h1>
+          <p>Dashboard</p>
+          <button id="apri-configurazione">Configurazione</button>
+          <button id="dimentica-token">Dimentica il token</button>
+        `;
+        document
+          .getElementById("apri-configurazione")
+          .addEventListener("click", () => {
+            renderModulo(leggiConfigurazione().repoTesto);
+          });
+        document
+          .getElementById("dimentica-token")
+          .addEventListener("click", () => {
+            localStorage.removeItem(CHIAVE_TOKEN);
+            renderModulo(leggiConfigurazione().repoTesto);
+          });
+      }
+
+      function avvia() {
+        const configurazione = leggiConfigurazione();
+        if (configurazioneValida(configurazione)) {
+          renderDashboard();
+        } else {
+          renderModulo(configurazione.repoTesto);
+        }
+      }
+
+      avvia();
     </script>
   </body>
 </html>

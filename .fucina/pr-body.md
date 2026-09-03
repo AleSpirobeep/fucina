@@ -1,48 +1,45 @@
-Crea la cartella `ui/` con l'impalcatura minima richiesta dalla issue: `index.html`
-(pagina con titolo "Registro" che importa `lib.js` come modulo ES), `lib.js` (esporta
-`versione()` che restituisce `"0.1.0"`) e `lib.test.js` (test con `node:test` che la
-verifica).
+Implementa la configurazione iniziale del Registro (REQ-101, REQ-102, REQ-103):
+al primo avvio la pagina mostra un modulo per l'elenco dei repo e il token, li
+salva in `localStorage` e passa alla dashboard; ai successivi avvii parte
+direttamente dalla dashboard; un pulsante "Configurazione" riapre il modulo, uno
+"Dimentica il token" cancella solo il token e torna al modulo.
 
-Closes #13.
+La validazione del formato `proprietario/nome` (righe vuote ignorate) è in
+`ui/lib.js` (`parseElencoRepo`, `validaRepo`, `validaElencoRepo`,
+`configurazioneValida`), testata in un nuovo file `ui/configurazione.test.js`
+senza toccare `ui/lib.test.js`. `ui/index.html` importa queste funzioni e fa solo
+rendering/localStorage, come richiesto da `CLAUDE.md`.
 
-**Come l'ho verificato:** `node --test "ui/**/*.test.js"` e `node --test` (senza
-argomenti, che fa la scansione automatica della directory corrente) escono entrambi
-verdi. Vedi però la nota sotto: il comando letterale `node --test ui/` fallisce in
-questo ambiente per un motivo che non riguarda questi file.
+Il token non viene mai scritto in `console.log` né inserito in `innerHTML`: il
+campo del modulo parte sempre vuoto (vedi ADR) e viene letto/scritto solo tramite
+`localStorage` e la proprietà `.value` dell'input.
+
+Closes #14.
+
+**Come l'ho verificato:** `node --test "ui/**/*.test.js"` è verde (12 test, 12
+pass). Ho anche riletto manualmente il flusso nel file `index.html`: prima
+apertura senza dati in `localStorage` → modulo; salvataggio con repo/token validi
+→ dashboard; "Dimentica il token" → torna al modulo con l'elenco repo ancora
+precompilato ma il token vuoto; un elenco repo con una riga non valida mostra
+l'errore e non salva nulla.
 
 ## Decisioni
 
-Nessun ADR aggiunto: nessuna delle scelte di questo task era mia da prendere, ho
-seguito alla lettera il testo della issue.
-
-**Attenzione — possibile problema di ambiente sul comando dei test:** nel sandbox in
-cui ho lavorato, il comando letterale `node --test ui/` (quello indicato in
-`.fucina.yml` alla chiave `test_command`, e usato in `.github/workflows/ci.yml`)
-fallisce con `Cannot find module '.../ui'` invece di eseguire i test. Ho verificato che
-non è un problema del codice appena scritto: la stessa identica eccezione compare
-passando *qualsiasi* directory come argomento posizionale a `node --test`, comprese
-directory vuote e una chiamata letteralmente `test/` — sembra che in questa build di
-Node (`v22.23.2`) il runner non faccia la scansione ricorsiva quando riceve un
-argomento-directory nudo, solo quando non riceve argomenti (scansione automatica dalla
-cwd) o quando riceve un pattern glob esplicito come `"ui/**/*.test.js"`. Entrambe
-queste alternative, sullo stesso codice, escono verdi.
-
-Non ho toccato `.fucina.yml` né `.github/workflows/ci.yml` per non uscire dal
-perimetro della issue (e perché `ci.yml` è comunque un percorso protetto). Chi
-revisiona dovrebbe verificare se lo stesso comando fallisce anche sul runner reale di
-GitHub Actions (la versione di Node lì potrebbe differire da quella del sandbox) prima
-di dare per buono il check CI di questa PR: se fallisce anche lì, serve un intervento
-umano su `ci.yml` (fuori dal mio perimetro) o una decisione su come cambiare
-`test_command` in `.fucina.yml`.
+- [`docs/decisions/2026-09-03-1059-token-mai-precompilato.md`](../docs/decisions/2026-09-03-1059-token-mai-precompilato.md):
+  il campo token nel modulo non è mai precompilato con il valore salvato, per
+  rispettare alla lettera il criterio "il token non compare mai nell'HTML" anche
+  quando si riapre il modulo da "Configurazione". Vuoto al salvataggio = mantieni
+  il token attuale.
 
 ## Non fatto
 
-Nulla di quanto chiesto dalla issue: i tre file esistono con esattamente il contenuto
-richiesto e i criteri di accettazione su struttura/contenuto sono soddisfatti. L'unico
-punto aperto è la nota sopra sul comando `node --test ui/`, che è una scoperta
-sull'ambiente, non un requisito lasciato incompleto.
+Nulla di quanto chiesto dai criteri di accettazione di T2. Non ho toccato REQ-110
+e successivi (coda, avanzamento, comando): sono altre issue, fuori dal perimetro
+di questa.
 
 ## Fatto in più
 
-Nulla: solo i tre file richiesti dalla issue (`ui/index.html`, `ui/lib.js`,
-`ui/lib.test.js`) e questo `.fucina/pr-body.md`.
+Nulla oltre ai file necessari: modificato `ui/lib.js` (nuove funzioni pure),
+aggiunto `ui/configurazione.test.js`, riscritto `ui/index.html` (era solo un
+titolo statico), aggiunto l'ADR sopra e questo `.fucina/pr-body.md`. Non ho
+toccato `ui/lib.test.js`, né `specs/`, né i workflow.
