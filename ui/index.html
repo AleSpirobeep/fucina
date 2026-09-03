@@ -27,11 +27,23 @@
       <h2>Dashboard</h2>
       <button id="apriConfigurazione">Configurazione</button>
       <button id="dimenticaToken">Dimentica il token</button>
+
+      <section id="avanzamento">
+        <h2>Avanzamento</h2>
+        <div id="tabelleAvanzamento"></div>
+      </section>
     </section>
 
     <script type="module">
-      import { validaElencoRepo, configurazioneValida } from "./lib.js";
-      import "./github.js";
+      import {
+        validaElencoRepo,
+        configurazioneValida,
+        parseElencoRepo,
+        classifica,
+        tabellaAvanzamento,
+        ErroreGitHub,
+      } from "./lib.js";
+      import { issueAperte, issueChiuseDiRecente, prAperte } from "./github.js";
 
       const CHIAVE_TOKEN = "fucina.token";
       const CHIAVE_REPO = "fucina.repoTesto";
@@ -42,14 +54,95 @@
       const campoRepo = document.getElementById("repoTesto");
       const campoToken = document.getElementById("token");
       const erroreConfigurazione = document.getElementById("erroreConfigurazione");
+      const tabelleAvanzamento = document.getElementById("tabelleAvanzamento");
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
       }
 
+      function costruisciSezioneRepo(repo) {
+        const sezione = document.createElement("section");
+        const titolo = document.createElement("h3");
+        titolo.textContent = repo;
+        sezione.appendChild(titolo);
+        return sezione;
+      }
+
+      function costruisciTabellaRepo(repo, classificazione) {
+        const sezione = costruisciSezioneRepo(repo);
+        const tabella = document.createElement("table");
+        const righeIntestazione = document.createElement("tr");
+        const righeCorpo = document.createElement("tr");
+
+        for (const colonna of tabellaAvanzamento(classificazione)) {
+          const th = document.createElement("th");
+          th.textContent = `${colonna.etichetta} (${colonna.conteggio})`;
+          righeIntestazione.appendChild(th);
+
+          const td = document.createElement("td");
+          if (colonna.elementi.length === 0) {
+            td.textContent = "-";
+          } else {
+            const elenco = document.createElement("ul");
+            for (const elemento of colonna.elementi) {
+              const voce = document.createElement("li");
+              const link = document.createElement("a");
+              link.href = elemento.url;
+              link.textContent = elemento.titolo;
+              voce.appendChild(link);
+              elenco.appendChild(voce);
+            }
+            td.appendChild(elenco);
+          }
+          righeCorpo.appendChild(td);
+        }
+
+        const thead = document.createElement("thead");
+        thead.appendChild(righeIntestazione);
+        const tbody = document.createElement("tbody");
+        tbody.appendChild(righeCorpo);
+        tabella.appendChild(thead);
+        tabella.appendChild(tbody);
+        sezione.appendChild(tabella);
+        return sezione;
+      }
+
+      async function caricaAvanzamento() {
+        const token = tokenSalvato();
+        const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
+        tabelleAvanzamento.innerHTML = "";
+
+        for (const repo of repos) {
+          try {
+            const [issueAperteRepo, issueChiuseRepo, prRepo] = await Promise.all([
+              issueAperte(token, repo),
+              issueChiuseDiRecente(token, repo),
+              prAperte(token, repo),
+            ]);
+            const classificazione = classifica(
+              [...issueAperteRepo, ...issueChiuseRepo],
+              prRepo,
+              new Date().toISOString(),
+            );
+            tabelleAvanzamento.appendChild(costruisciTabellaRepo(repo, classificazione));
+          } catch (errore) {
+            const sezione = costruisciSezioneRepo(repo);
+            const messaggio = document.createElement("p");
+            messaggio.setAttribute("role", "alert");
+            messaggio.textContent =
+              errore instanceof ErroreGitHub
+                ? errore.message
+                : "Errore nel caricamento dell'avanzamento.";
+            sezione.appendChild(messaggio);
+            tabelleAvanzamento.appendChild(sezione);
+          }
+        }
+      }
+
       function mostraDashboard() {
         sezioneConfigurazione.hidden = true;
         sezioneDashboard.hidden = false;
+        caricaAvanzamento();
       }
 
       function mostraConfigurazione() {
