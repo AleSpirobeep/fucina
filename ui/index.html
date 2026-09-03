@@ -3,6 +3,260 @@
   <head>
     <meta charset="utf-8" />
     <title>Registro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Newsreader:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <style>
+      :root {
+        --colore-sfondo: #eef2ef;
+        --colore-sfondo-rialzato: #f8faf9;
+        --colore-testo: #1c2622;
+        --colore-testo-attenuato: #526059;
+        --colore-bordo: #c7d1cb;
+        --colore-accento: #1f6f78;
+        --colore-accento-scuro: #154f56;
+        --colore-accento-testo: #ffffff;
+        --colore-ambra: #a15c00;
+        --colore-ambra-sfondo: #fbead0;
+        --colore-ambra-bordo: #d99a3d;
+        --colore-ambra-testo: #3a2405;
+        --colore-ambra-bottone-testo: #fffaf3;
+        --colore-errore: #a12626;
+        --colore-errore-sfondo: #f9dede;
+        --font-titoli: "Archivo", "Segoe UI", system-ui, sans-serif;
+        --font-testo: "Newsreader", Georgia, "Times New Roman", serif;
+        --font-dati: "JetBrains Mono", "Consolas", "SFMono-Regular", monospace;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --colore-sfondo: #131715;
+          --colore-sfondo-rialzato: #1c211e;
+          --colore-testo: #e4ebe6;
+          --colore-testo-attenuato: #a9b6ae;
+          --colore-bordo: #384039;
+          --colore-accento: #6cc2cd;
+          --colore-accento-scuro: #9adde5;
+          --colore-accento-testo: #0b2224;
+          --colore-ambra: #eab566;
+          --colore-ambra-sfondo: #3a2a10;
+          --colore-ambra-bordo: #8a611f;
+          --colore-ambra-testo: #fbead0;
+          --colore-ambra-bottone-testo: #2b1600;
+          --colore-errore: #e59a9a;
+          --colore-errore-sfondo: #3a1a1a;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 1200px;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1.5rem 2rem 3rem;
+        background: var(--colore-sfondo);
+        color: var(--colore-testo);
+        font-family: var(--font-testo);
+        font-size: 1rem;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: var(--font-titoli);
+        font-weight: 600;
+        color: var(--colore-testo);
+      }
+
+      h1 {
+        font-size: 1.75rem;
+        margin-bottom: 1rem;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+      }
+
+      h3 {
+        font-size: 1.05rem;
+        margin-bottom: 0.5rem;
+      }
+
+      a {
+        color: var(--colore-accento-scuro);
+      }
+
+      a:hover {
+        color: var(--colore-accento);
+      }
+
+      button {
+        font-family: var(--font-titoli);
+        font-size: 0.9rem;
+        font-weight: 600;
+        background: var(--colore-accento);
+        color: var(--colore-accento-testo);
+        border: 1px solid var(--colore-accento-scuro);
+        border-radius: 0.3rem;
+        padding: 0.4rem 0.9rem;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      section {
+        background: var(--colore-sfondo-rialzato);
+        border: 1px solid var(--colore-bordo);
+        border-radius: 0.5rem;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+
+      #dashboard > section {
+        margin-top: 1.5rem;
+      }
+
+      #ultimoAggiornamento {
+        font-family: var(--font-dati);
+        font-size: 0.85rem;
+        color: var(--colore-testo-attenuato);
+      }
+
+      #banner {
+        font-family: var(--font-dati);
+        font-size: 0.85rem;
+        background: var(--colore-errore-sfondo);
+        color: var(--colore-errore);
+        border: 1px solid var(--colore-errore);
+        border-radius: 0.4rem;
+        padding: 0.6rem 0.9rem;
+        margin-top: 0.75rem;
+      }
+
+      #aspettanoTe {
+        background: var(--colore-ambra-sfondo);
+        border: 1px solid var(--colore-ambra-bordo);
+        border-left: 0.4rem solid var(--colore-ambra);
+        color: var(--colore-ambra-testo);
+      }
+
+      #aspettanoTe h2,
+      #aspettanoTe h3 {
+        color: var(--colore-ambra-testo);
+      }
+
+      #aspettanoTe a {
+        color: var(--colore-ambra-testo);
+      }
+
+      #aspettanoTe ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      #aspettanoTe li {
+        border-top: 1px solid var(--colore-ambra-bordo);
+        padding: 0.75rem 0;
+      }
+
+      #aspettanoTe li:first-child {
+        border-top: none;
+        padding-top: 0.25rem;
+      }
+
+      .rispondi-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+        max-width: 40rem;
+      }
+
+      .rispondi-form textarea {
+        font-family: var(--font-testo);
+        font-size: 0.95rem;
+        border: 1px solid var(--colore-ambra-bordo);
+        border-radius: 0.3rem;
+        padding: 0.5rem;
+      }
+
+      .rispondi-form button {
+        align-self: flex-start;
+        background: var(--colore-ambra);
+        color: var(--colore-ambra-bottone-testo);
+        border-color: var(--colore-ambra-bordo);
+      }
+
+      .griglia-secondaria {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        gap: 1.5rem;
+        align-items: start;
+      }
+
+      .griglia-secondaria > section {
+        min-width: 0;
+        margin-bottom: 0;
+      }
+
+      table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        font-family: var(--font-dati);
+        font-size: 0.85rem;
+      }
+
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        border: 1px solid var(--colore-bordo);
+        padding: 0.4rem 0.5rem;
+      }
+
+      th {
+        background: var(--colore-sfondo);
+        font-weight: 500;
+      }
+
+      td ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      label {
+        font-family: var(--font-titoli);
+        font-size: 0.9rem;
+      }
+
+      input,
+      textarea {
+        font-family: var(--font-testo);
+        background: var(--colore-sfondo-rialzato);
+        color: var(--colore-testo);
+        border: 1px solid var(--colore-bordo);
+        border-radius: 0.3rem;
+        padding: 0.4rem;
+      }
+
+      [role="alert"] {
+        color: var(--colore-errore);
+        font-size: 0.9rem;
+      }
+    </style>
   </head>
   <body>
     <h1>Registro</h1>
@@ -36,15 +290,17 @@
         <div id="elencoAspettanoTe"></div>
       </section>
 
-      <section id="avanzamento">
-        <h2>Avanzamento</h2>
-        <div id="tabelleAvanzamento"></div>
-      </section>
+      <div class="griglia-secondaria">
+        <section id="avanzamento">
+          <h2>Avanzamento</h2>
+          <div id="tabelleAvanzamento"></div>
+        </section>
 
-      <section id="agentiAttivi">
-        <h2>Agenti attivi</h2>
-        <div id="elencoAgentiAttivi"></div>
-      </section>
+        <section id="agentiAttivi">
+          <h2>Agenti attivi</h2>
+          <div id="elencoAgentiAttivi"></div>
+        </section>
+      </div>
     </section>
 
     <script type="module">
@@ -292,6 +548,7 @@
 
       function costruisciFormRispondiERiavvia(issue, repo) {
         const contenitore = document.createElement("div");
+        contenitore.className = "rispondi-form";
         const campo = document.createElement("textarea");
         campo.rows = 3;
         campo.placeholder = "Scrivi la risposta…";
