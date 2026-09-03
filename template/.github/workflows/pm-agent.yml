@@ -8,7 +8,9 @@ name: pm-agent
 # esegue con `gh` e non chiama mai il modello. Se serve giudizio (revisione di
 # una PR, risposta a una domanda) l'esecuzione si rilancia in workflow_dispatch
 # con l'oggetto da lavorare e termina: il modello viene chiamato solo in quel
-# contesto (T003; qui stampa solo un segnaposto). Dopo un'azione deterministica
+# contesto, e produce un solo file (verdetto.json, contracts/verdetto.md) che il
+# workflow esegue — fusione, chiusura, commenti, label — senza mai dargli uno
+# strumento di scrittura su GitHub. Dopo un'azione deterministica o un verdetto
 # lo stato viene riletto e lo script rieseguito: solo se resta lavoro
 # l'esecuzione rilancia una scansione di recupero. Un giro senza lavoro non
 # scrive nulla (REQ-242) e non c'è mai più di un'esecuzione in corso per repo
@@ -155,11 +157,18 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$MODALITA" = "modello" ]; then
-            # Oggetto già scelto dal dispatch: niente da decidere (T003 lo userà).
+            # Oggetto già scelto dal dispatch: niente da decidere, solo tradurlo
+            # nella richiesta in linguaggio naturale che entra nel prompt del PM.
+            if [ "$AZIONE_INPUT" = "revisione" ]; then
+              RICHIESTA="Revisiona la PR #${NUMERO_INPUT}."
+            else
+              RICHIESTA="Rispondi alla issue #${NUMERO_INPUT}."
+            fi
             {
               echo "azione=$AZIONE_INPUT"
               echo "numero=$NUMERO_INPUT"
               echo "motivo=dispatch esplicito per il modello"
+              echo "richiesta=$RICHIESTA"
               echo "dettagli_issue="
               echo "dettagli_task="
               echo "dettagli_manca="
@@ -387,11 +396,289 @@ jobs:
           echo "Rilancio in workflow_dispatch: azione=$AZIONE numero=$NUMERO"
           gh workflow run pm-agent.yml -f azione="$AZIONE" -f numero="$NUMERO"
 
-      - name: Esegui il PM
+      - name: Prepara la cartella di lavoro del PM
         if: steps.modalita.outputs.modalita == 'modello'
         run: |
           set -euo pipefail
-          echo "modello: T003"
+          mkdir -p "$RUNNER_TEMP/fucina/decisioni"
+
+      - name: Esegui il PM
+        if: steps.modalita.outputs.modalita == 'modello'
+        # Un tetto di turni o di spesa superato fa fallire l'action: senza
+        # questo, tutti i passi seguenti verrebbero saltati e l'esito `umano`
+        # di riserva di "Leggi il verdetto" (REQ-222) non verrebbe mai prodotto
+        # — proprio il modo più probabile in cui il PM non conclude.
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_BASE_URL: ${{ steps.cfg.outputs.endpoint }}
+          # Sola lettura: PR, issue, run. Il PAT non serve al modello, che non
+          # scrive mai su GitHub (REQ-270, REQ-271) — solo verdetto.json e,
+          # facoltativamente, ADR dentro CARTELLA_FUCINA.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: false
+          prompt: |
+            /pm-agent
+
+            ${{ steps.decisione.outputs.richiesta }}
+
+            CARTELLA_FUCINA=${{ runner.temp }}/fucina
+          claude_args: |
+            --model ${{ steps.cfg.outputs.modello }}
+            --max-turns ${{ steps.cfg.outputs.max_turns }}
+            --max-budget-usd ${{ steps.cfg.outputs.max_budget }}
+            --allowedTools "${{ steps.cfg.outputs.strumenti }}"
+
+      - name: Leggi il verdetto
+        if: steps.modalita.outputs.modalita == 'modello'
+        id: verdetto
+        env:
+          FILE: ${{ runner.temp }}/fucina/verdetto.json
+          MOTIVO_FILE: ${{ runner.temp }}/fucina-verdetto-motivo.txt
+          COMMENTO_FILE: ${{ runner.temp }}/fucina-verdetto-commento.md
+          NUOVE_ISSUE_FILE: ${{ runner.temp }}/fucina-verdetto-nuove-issue.json
+          # Il tipo atteso viene dal contesto della richiesta, non dal file: un
+          # verdetto che si autodichiara del tipo sbagliato non deve poter
+          # scegliere quale tabella di esiti gli si applica.
+          TIPO_ATTESO: ${{ steps.decisione.outputs.azione == 'revisione' && 'pr' || 'issue' }}
+          NUMERO_ATTESO: ${{ steps.decisione.outputs.numero }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          RUN_LINK="${SERVER_URL}/${REPO}/actions/runs/${RUN_ID}"
+          CAUSA=""
+
+          if [ ! -f "$FILE" ]; then
+            CAUSA="il file verdetto.json non esiste"
+          elif ! jq -e . "$FILE" >/dev/null 2>&1; then
+            CAUSA="verdetto.json non è JSON valido"
+          else
+            VERSIONE=$(jq -r '.versione // empty' "$FILE")
+            NUMERO_FILE=$(jq -r '.oggetto.numero // empty' "$FILE")
+            ESITO_FILE=$(jq -r '.esito // empty' "$FILE")
+            if [ "$VERSIONE" != "1" ]; then
+              CAUSA="versione \"$VERSIONE\" non è 1"
+            elif [ "$NUMERO_FILE" != "$NUMERO_ATTESO" ]; then
+              CAUSA="il verdetto riguarda #$NUMERO_FILE invece di #$NUMERO_ATTESO"
+            elif [ "$TIPO_ATTESO" = "pr" ] && [[ ! "$ESITO_FILE" =~ ^(fondi|rimanda|umano)$ ]]; then
+              CAUSA="esito \"$ESITO_FILE\" non ammesso per una PR"
+            elif [ "$TIPO_ATTESO" = "issue" ] && [[ ! "$ESITO_FILE" =~ ^(rispondi|umano|riscrivi)$ ]]; then
+              CAUSA="esito \"$ESITO_FILE\" non ammesso per una issue"
+            fi
+          fi
+
+          # `esito` e `tipo` sono gli unici output di questo passo, perché
+          # decidono quale ramo eseguire: restano valori scelti dal workflow
+          # (l'enum sopra, o "umano"), mai testo scritto dal modello. `motivo`,
+          # `commento` e `nuove_issue` sono contenuto del PM e restano file in
+          # $RUNNER_TEMP, letti direttamente dai passi che li usano (già con
+          # `--body-file`): non passano mai per il canale chiave=valore di
+          # GITHUB_OUTPUT, dove un `commento` che contenesse una riga uguale al
+          # delimitatore dell'heredoc potrebbe iniettare output arbitrari e
+          # cambiare l'esito eseguito.
+          if [ -n "$CAUSA" ]; then
+            ESITO="umano"
+            echo "Il PM non ha concluso: $CAUSA" > "$MOTIVO_FILE"
+            echo "Il PM non ha concluso: ${CAUSA}. Log: ${RUN_LINK}" > "$COMMENTO_FILE"
+            echo "[]" > "$NUOVE_ISSUE_FILE"
+          else
+            ESITO="$ESITO_FILE"
+            jq -r '.motivo // ""' "$FILE" > "$MOTIVO_FILE"
+            jq -r '.commento // ""' "$FILE" > "$COMMENTO_FILE"
+            jq -c '.nuove_issue // []' "$FILE" > "$NUOVE_ISSUE_FILE"
+          fi
+
+          echo "esito=$ESITO" >> "$GITHUB_OUTPUT"
+          echo "tipo=$TIPO_ATTESO" >> "$GITHUB_OUTPUT"
+
+      - name: Pubblica gli ADR del PM
+        if: steps.modalita.outputs.modalita == 'modello'
+        id: adr
+        env:
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
+          RAMO: ${{ github.event.repository.default_branch }}
+        run: |
+          # Niente `-e`: l'intero passo, non solo il push, non deve mai
+          # impedire l'esecuzione del verdetto (REQ-234). Senza, un `git
+          # commit` che esce 1 perché non c'è nulla da committare (un ADR
+          # identico a uno già su main), o `docs/decisions/` assente nel repo
+          # di destinazione, ucciderebbero il passo prima di arrivare ai rami
+          # dell'esito. Ogni comando che può fallire è verificato esplicitamente.
+          set -uo pipefail
+          CARTELLA="$RUNNER_TEMP/fucina/decisioni"
+          ERRORE=""
+
+          if [ -d "$CARTELLA" ] && [ -n "$(ls -A "$CARTELLA" 2>/dev/null)" ]; then
+            mkdir -p docs/decisions
+            git config user.name "pm-agent"
+            git config user.email "pm-agent@users.noreply.github.com"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+            FALLITO=0
+            for FILE in "$CARTELLA"/*.md; do
+              NOME=$(basename "$FILE")
+              if ! cp "$FILE" "docs/decisions/$NOME" || ! git add "docs/decisions/$NOME" || ! git commit -m "ADR del PM: $NOME"; then
+                FALLITO=1
+              fi
+            done
+
+            if [ "$FALLITO" -eq 1 ]; then
+              ERRORE="la pubblicazione di uno o più ADR è fallita (vedi log)"
+            elif ! git push origin "HEAD:$RAMO"; then
+              ERRORE="il push degli ADR su $RAMO è fallito (vedi log)"
+            fi
+          else
+            echo "Nessun ADR da pubblicare."
+          fi
+
+          if [ -n "$ERRORE" ]; then
+            echo "::warning::$ERRORE"
+          fi
+          echo "errore=$ERRORE" >> "$GITHUB_OUTPUT"
+
+      - name: "Verdetto: fondi"
+        if: steps.modalita.outputs.modalita == 'modello' && steps.verdetto.outputs.esito == 'fondi'
+        env:
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
+          NUMERO: ${{ steps.decisione.outputs.numero }}
+        run: |
+          set -euo pipefail
+          if ERRORE=$(gh pr merge "$NUMERO" --squash --delete-branch 2>&1); then
+            echo "PR #$NUMERO fusa."
+          else
+            echo "::warning::Fusione della PR #$NUMERO fallita: $ERRORE"
+            gh pr edit "$NUMERO" --add-label needs-human
+            {
+              echo "<!-- fucina:pm-umano -->La fusione automatica è fallita:"
+              echo ""
+              echo '```'
+              echo "$ERRORE"
+              echo '```'
+            } > "$RUNNER_TEMP/fucina-commento.md"
+            gh pr comment "$NUMERO" --body-file "$RUNNER_TEMP/fucina-commento.md"
+          fi
+
+      - name: "Verdetto: rimanda"
+        if: steps.modalita.outputs.modalita == 'modello' && steps.verdetto.outputs.esito == 'rimanda'
+        env:
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
+          NUMERO: ${{ steps.decisione.outputs.numero }}
+          COMMENTO_FILE: ${{ runner.temp }}/fucina-verdetto-commento.md
+        run: |
+          set -euo pipefail
+          gh pr comment "$NUMERO" --body-file "$COMMENTO_FILE"
+          gh pr close "$NUMERO" --delete-branch
+
+          CORPO=$(gh pr view "$NUMERO" --json body --jq '.body // ""')
+          ISSUE=$(printf '%s' "$CORPO" | grep -ioP 'closes\s*#\K\d+' | head -1 || true)
+          if [ -n "$ISSUE" ]; then
+            gh issue comment "$ISSUE" --body-file "$COMMENTO_FILE"
+            gh issue edit "$ISSUE" --add-label ready-for-dev --remove-label in-progress
+          else
+            echo "::warning::PR #$NUMERO senza issue collegata (Closes #): nessuna issue riportata a ready-for-dev."
+          fi
+
+      - name: "Verdetto: rispondi"
+        if: steps.modalita.outputs.modalita == 'modello' && steps.verdetto.outputs.esito == 'rispondi'
+        env:
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
+          NUMERO: ${{ steps.decisione.outputs.numero }}
+          COMMENTO_FILE: ${{ runner.temp }}/fucina-verdetto-commento.md
+        run: |
+          set -euo pipefail
+          gh issue comment "$NUMERO" --body-file "$COMMENTO_FILE"
+          gh issue edit "$NUMERO" --remove-label needs-human --add-label ready-for-dev
+
+      - name: "Verdetto: umano"
+        if: steps.modalita.outputs.modalita == 'modello' && steps.verdetto.outputs.esito == 'umano'
+        env:
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
+          TIPO: ${{ steps.verdetto.outputs.tipo }}
+          NUMERO: ${{ steps.decisione.outputs.numero }}
+          COMMENTO_FILE: ${{ runner.temp }}/fucina-verdetto-commento.md
+        run: |
+          set -euo pipefail
+          {
+            cat "$COMMENTO_FILE"
+            echo ""
+            echo "<!-- fucina:pm-umano -->"
+          } > "$RUNNER_TEMP/fucina-commento-umano.md"
+
+          if [ "$TIPO" = "pr" ]; then
+            gh pr comment "$NUMERO" --body-file "$RUNNER_TEMP/fucina-commento-umano.md"
+            gh pr edit "$NUMERO" --add-label needs-human
+          else
+            # Le issue arrivano qui già needs-human (revisione/domanda partono da
+            # quella label): nessuna etichetta da aggiungere (REQ-232).
+            gh issue comment "$NUMERO" --body-file "$RUNNER_TEMP/fucina-commento-umano.md"
+          fi
+
+      - name: "Verdetto: riscrivi"
+        if: steps.modalita.outputs.modalita == 'modello' && steps.verdetto.outputs.esito == 'riscrivi'
+        env:
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
+          NUMERO: ${{ steps.decisione.outputs.numero }}
+          COMMENTO_FILE: ${{ runner.temp }}/fucina-verdetto-commento.md
+          NUOVE_ISSUE_FILE: ${{ runner.temp }}/fucina-verdetto-nuove-issue.json
+        run: |
+          set -euo pipefail
+          jq -c '.[]' "$NUOVE_ISSUE_FILE" | while IFS= read -r VOCE; do
+            TITOLO=$(echo "$VOCE" | jq -r '.titolo')
+            echo "$VOCE" | jq -r '.corpo' > "$RUNNER_TEMP/fucina-nuova-issue.md"
+            gh issue create --title "$TITOLO" --label in-coda --body-file "$RUNNER_TEMP/fucina-nuova-issue.md"
+          done
+
+          gh issue comment "$NUMERO" --body-file "$COMMENTO_FILE"
+          gh issue close "$NUMERO"
+
+      - name: Commenta il rapporto (modello)
+        if: steps.modalita.outputs.modalita == 'modello'
+        env:
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
+          RAPPORTO: ${{ steps.rapporto.outputs.numero }}
+          AZIONE: ${{ steps.decisione.outputs.azione }}
+          ESITO: ${{ steps.verdetto.outputs.esito }}
+          MOTIVO_FILE: ${{ runner.temp }}/fucina-verdetto-motivo.txt
+          TIPO: ${{ steps.verdetto.outputs.tipo }}
+          NUMERO: ${{ steps.decisione.outputs.numero }}
+          ADR_ERRORE: ${{ steps.adr.outputs.errore }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          MOTIVO=$(cat "$MOTIVO_FILE")
+          if [ "$TIPO" = "pr" ]; then TIPO_URL="pull"; else TIPO_URL="issues"; fi
+          OGGETTO="${SERVER_URL}/${REPO}/${TIPO_URL}/${NUMERO}"
+          RUN_LINK="${SERVER_URL}/${REPO}/actions/runs/${RUN_ID}"
+
+          TESTO="**${ESITO}** su ${OGGETTO} (${AZIONE}) — ${MOTIVO}. [Esecuzione](${RUN_LINK})"
+          if [ -n "$ADR_ERRORE" ]; then
+            TESTO="${TESTO} — ${ADR_ERRORE}"
+          fi
+          gh issue comment "$RAPPORTO" --body "$TESTO"
+
+      - name: Rilancia se resta lavoro (dopo il verdetto)
+        if: steps.modalita.outputs.modalita == 'modello'
+        env:
+          GH_TOKEN_LETTURA: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN_RILANCIO: ${{ secrets.GITHUB_TOKEN }}
+          RAPPORTO: ${{ steps.rapporto.outputs.numero }}
+        run: |
+          set -euo pipefail
+          STATO_FILE="$RUNNER_TEMP/fucina-pm-stato-dopo-modello.json"
+          GH_TOKEN="$GH_TOKEN_LETTURA" bash scripts/raccogli-stato.sh "$RAPPORTO" > "$STATO_FILE"
+          AZIONE=$(node scripts/pm-coda.js < "$STATO_FILE" | jq -r '.azione')
+          if [ "$AZIONE" = "niente" ]; then
+            echo "Nessun lavoro residuo: nessun rilancio."
+          else
+            echo "Lavoro residuo (azione=$AZIONE): rilancio una scansione."
+            GH_TOKEN="$GH_TOKEN_RILANCIO" gh workflow run pm-agent.yml -f azione=scansione
+          fi
 
       - name: Rilancia se resta lavoro
         # REQ-203/205: dopo un'azione deterministica lo stato è cambiato. Si
