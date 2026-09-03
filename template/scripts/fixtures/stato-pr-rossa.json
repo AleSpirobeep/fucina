@@ -1,0 +1,25 @@
+{
+  "rapporto": 1,
+  "pr": [
+    {
+      "numero": 41,
+      "titolo": "T007: nuova funzione",
+      "labels": [
+        "needs-review"
+      ],
+      "corpo": "## Cosa ho fatto\n\nLa docstring di `arrotonda` (in `listino/prezzi.py`) era una sola riga e non\nmostrava un esempio del comportamento di arrotondamento \"half up\". Ho\naggiunto un esempio in formato doctest che mostra `arrotonda(Decimal(\"2.025\"))\n== Decimal(\"2.03\")`, chiarendo la differenza rispetto all'arrotondamento\nbancario (half even), che in questo caso darebbe 2.02.\n\n## Come l'ho verificato\n\n- `pytest -q`: 30 passed.\n- L'esempio nella docstring usa lo stesso caso già coperto da\n  `tests/test_prezzi.py::TestArrotonda::test_half_up_non_half_even`, quindi\n  il comportamento mostrato è già garantito dalla suite esistente.\n\nCloses #8\n\n## Decisioni\n\nNessun ADR: si tratta di un ampliamento di documentazione, non di una\ndecisione di comportamento o di design.\n\n## Non fatto\n\nNulla: l'unica richiesta dell'issue era ampliare la docstring con un\nesempio, ed è stato fatto.\n\n## Fatto in più\n\nNulla: ho toccato solo `listino/prezzi.py`, il file indicato dall'issue.\n\nGenerated with Claude Code https://claude.ai/code\n\nCloses #8\n",
+      "check": "rosso",
+      "ultimoCommentoPm": false
+    }
+  ],
+  "issue": [
+    {
+      "numero": 8,
+      "titolo": "T007: nuova funzione",
+      "labels": [
+        "in-progress"
+      ],
+      "ultimoCommentoPm": false
+    }
+  ]
+}

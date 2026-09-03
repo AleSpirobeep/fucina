@@ -1,0 +1,9 @@
+{
+  "rapporto": 1,
+  "pr": [],
+  "issue": [
+    { "numero": 20, "titolo": "T004b: rifinisci il caso limite", "labels": ["in-coda"], "ultimoCommentoPm": false },
+    { "numero": 19, "titolo": "T004a: gestisci il caso in più", "labels": ["in-coda"], "ultimoCommentoPm": false },
+    { "numero": 21, "titolo": "T005: prossimo task", "labels": ["in-coda"], "ultimoCommentoPm": false }
+  ]
+}
