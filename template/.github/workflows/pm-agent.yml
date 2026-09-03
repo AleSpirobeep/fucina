@@ -223,7 +223,15 @@ jobs:
             elif [ "$WESITO" -eq 124 ]; then
               ESITO="tetto-superato"
             else
-              CONTEGGIO=$(gh pr checks "$NUMERO" --json bucket --jq 'length')
+              # `gh pr checks --json` esce non-zero anche quando non c'è ancora
+              # nessun check registrato (populateStatusChecks nel sorgente di gh
+              # restituisce l'errore "no checks reported" prima di arrivare
+              # all'exporter JSON), oltre che per un errore di rete transitorio.
+              # Sotto `set -e` un'uscita non-zero qui ucciderebbe il passo prima
+              # di raggiungere il tetto: si tollera il fallimento e lo si conta
+              # come "nessun check visto in questo giro", come fa già
+              # raccogli-stato.sh per la stessa chiamata.
+              CONTEGGIO=$(gh pr checks "$NUMERO" --json bucket --jq 'length' 2>/dev/null || echo 0)
               if [ "$CONTEGGIO" -gt 0 ]; then
                 ESITO="conclusi"
               else
