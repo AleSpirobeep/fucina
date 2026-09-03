@@ -3,11 +3,11 @@ status: accepted
 date: 2026-09-03
 decision-makers: [dev-agent]
 ---
-# Tre dettagli implementativi di `pm-agent.yml` non coperti dai contratti
+# Due dettagli implementativi di `pm-agent.yml` non coperti dai contratti
 
 ## Contesto e problema
 `data-model.md` e `contracts/fucina-yml.md` definiscono il comportamento del PM ma
-lasciano scoperti tre casi minori, incontrati scrivendo `template/.github/workflows/
+lasciano scoperti due casi minori, incontrati scrivendo `template/.github/workflows/
 pm-agent.yml` (T002).
 
 ## Opzioni considerate e decisione
@@ -31,20 +31,18 @@ merge`, `git commit`, …) restano un confronto di sottostringa su ciascun eleme
 risultato pratico non cambia per i casi che il contratto vuole vietare, ma non blocca
 gli strumenti di sola lettura con pattern.
 
-**3. Rilancio incondizionato dopo un'azione deterministica.**
-`plan.md` (passo 6) descrive: "rieseguire lo script sullo stato aggiornato e, se c'è
-ancora lavoro, `gh workflow run`". Ricalcolare lo stato una seconda volta nella stessa
-esecuzione avrebbe richiesto duplicare l'intero passo "Raccogli lo stato" (raccolta
-non banale, con una chiamata `gh` per PR/issue). **Decisione**: dopo ogni azione
-deterministica si rilancia sempre una scansione di recupero, senza ricalcolare prima
-se resta lavoro. Il costo è un'esecuzione in più quando la coda si è appena svuotata:
-quella esecuzione trova `niente` e non scrive nulla (REQ-242), quindi non viola
-REQ-201 (il costo zero riguarda i periodi senza eventi, non l'esecuzione immediatamente
-successiva a un'azione reale).
-
 ## Conseguenze
 Nessun requisito cambia. Il comportamento osservabile per gli scenari di accettazione
-di `spec.md` e i collaudi di `quickstart.md` resta quello descritto; le uniche
-differenze sono nel numero di esecuzioni "vuote" (un'in più per azione deterministica)
-e nella granularità del controllo su `strumenti_permessi` (per elemento invece che
+di `spec.md` e i collaudi di `quickstart.md` resta quello descritto; l'unica differenza
+è nella granularità del controllo su `strumenti_permessi` (per elemento invece che
 sull'intera stringa).
+
+## Nota
+
+Un terzo punto — se rilanciare sempre una scansione di recupero dopo un'azione
+deterministica o solo quando resta lavoro — era inizialmente registrato qui come
+decisione, ma non lo è: `plan.md` (passo 6) lo copre già esplicitamente ("rieseguire
+lo script sullo stato aggiornato e, se c'è ancora lavoro, `gh workflow run`"). La
+raccolta dello stato è ora fattorizzata in `template/scripts/raccogli-stato.sh`,
+richiamato sia prima della prima decisione sia dopo un'azione deterministica, cosa
+che rende il ricalcolo pratico senza duplicare la logica.
