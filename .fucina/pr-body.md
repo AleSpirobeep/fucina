@@ -1,31 +1,59 @@
-Implementa T9 (REQ-122): aggiornamento automatico della dashboard ogni 60 secondi, pulsante manuale "Aggiorna", ora dell'ultimo aggiornamento riuscito e riquadro degli errori in cima, senza far sparire i dati precedenti quando una chiamata fallisce.
+Implementa T10 (REQ-130, REQ-131, REQ-132): su ogni issue `needs-human` della sezione
+"Aspettano te" un campo di testo e un pulsante "Rispondi e riavvia" che, dopo conferma,
+pubblica il commento, toglie `needs-human` e mette `ready-for-dev`, fermandosi al primo
+errore.
 
 ## Cosa cambia
 
 - `ui/lib.js`: nuove funzioni pure
-  - `formattaOra` — formatta un timestamp ISO come `HH:MM:SS`.
-  - `creaStatoSezione` / `aggiornaStatoRepo` — stato per repo di una sezione della dashboard: su un errore mantengono i dati dell'ultima chiamata riuscita e marcano la voce `nonAggiornato`.
-  - `creaStatoAggiornamento` / `avviaAggiornamento` / `terminaAggiornamento` — macchina a stati del ciclo di aggiornamento: `avviaAggiornamento` restituisce `null` se un ciclo è già in corso, così un click sul pulsante manuale mentre gira quello automatico non genera un secondo giro di richieste; `terminaAggiornamento` registra l'ora solo se il ciclo non ha avuto errori.
-- `ui/index.html`:
-  - le tre sezioni (Aspettano te, Avanzamento, Agenti attivi) ora tengono lo stato per repo tra un ciclo e l'altro invece di ricostruirlo da zero: se una chiamata fallisce, la sezione di quel repo resta con l'ultimo contenuto valido e un messaggio "Dati non aggiornati: ..." in testa.
-  - nuovo pulsante "Aggiorna", etichetta "Ultimo aggiornamento riuscito: HH:MM:SS" e un riquadro `#banner` in cima che elenca repo e sezione di ogni errore in corso.
-  - `setInterval` da 60 secondi avviato una sola volta all'ingresso in dashboard; sia il timer che il pulsante chiamano la stessa `aggiorna()`, che usa `avviaAggiornamento` per evitare richieste doppie in sovrapposizione.
+  - `urlLabelIssue` / `urlRimuoviLabelIssue` — URL per aggiungere e togliere
+    un'etichetta di una issue.
+  - `testoRispostaValido` — vero solo se il campo non è vuoto o di soli spazi;
+    guida il disabilitato del pulsante.
+  - `messaggioConfermaRisposta` — testo della finestra di conferma: titolo, numero
+    della issue e il commento che sta per essere pubblicato.
+  - `FASE_COMMENTO` / `FASE_RIMUOVI_NEEDS_HUMAN` / `FASE_AGGIUNGI_READY_FOR_DEV` e
+    `messaggioErroreFase` — dicono quale delle tre chiamate è fallita.
+- `ui/github.js`:
+  - `richiesta` ora accetta un metodo HTTP e un corpo, e gestisce le risposte `204`
+    (le DELETE sulle etichette non hanno corpo JSON).
+  - `pubblicaCommento`, `rimuoviLabel`, `aggiungiLabel` — le tre chiamate singole.
+  - `rispondiERiavvia` — le esegue in ordine (commento, poi rimozione di
+    `needs-human`, poi aggiunta di `ready-for-dev`) e si ferma al primo errore,
+    rilanciandolo come `ErroreFase` con la fase e la causa originale.
+- `ui/index.html`: ogni issue bloccata in "Aspettano te" ha ora una `textarea`, un
+  pulsante disabilitato finché il campo è vuoto, e un `window.confirm()` con il testo
+  di `messaggioConfermaRisposta` prima di chiamare `rispondiERiavvia`. In caso di
+  errore mostra `messaggioErroreFase` sotto il campo; in caso di successo svuota il
+  campo e rilancia un aggiornamento completo della dashboard.
 
 ## Come l'ho verificato
 
-- `node --test "ui/**/*.test.js"` — 95 test, tutti verdi (11 nuovi in `ui/aggiornamento.test.js` per `formattaOra`, `aggiornaStatoRepo`, e la macchina a stati di `avviaAggiornamento`/`terminaAggiornamento`, incluso il caso di doppio avvio rifiutato).
-- La logica di rete/DOM (timer, click, banner) non è testabile senza browser: è stata verificata a lettura di codice, seguendo lo stesso schema già in uso in `index.html` per T6/T7/T8.
+- `node --test "ui/**/*.test.js"` — 113 test, tutti verdi (21 nuovi in
+  `ui/rispondi-e-riavvia.test.js`, incluso l'ordine delle tre chiamate, l'arresto alla
+  prima chiamata fallita con token senza permesso di scrittura, e il fatto che un
+  fallimento sulla rimozione dell'etichetta non arrivi mai ad aggiungere
+  `ready-for-dev`).
+- La conferma nativa del browser e il disabilitato del pulsante sono wiring DOM in
+  `index.html`, non testabile senza browser: verificati a lettura di codice, con lo
+  stesso schema già in uso per T6/T7/T8/T9.
+
+Closes #22
 
 ## Decisioni
 
-Nessun ADR aggiunto: le scelte (dedup con `avviaAggiornamento` che restituisce `null`, timestamp aggiornato solo sui cicli senza errori, stato per repo invece che per sezione intera) sono implementazione diretta di REQ-122 e non cambiano comportamento visibile oltre a quanto richiesto dall'issue.
+- [2026-09-03-1425-conferma-nativa-rispondi-e-riavvia.md](../docs/decisions/2026-09-03-1425-conferma-nativa-rispondi-e-riavvia.md):
+  uso `window.confirm()` invece di un modale custom per la conferma di REQ-132, in
+  attesa dell'identità visiva di T11.
 
 ## Non fatto
 
-Nulla dei criteri di accettazione della issue: l'ora cambia ogni minuto tramite il timer, un token revocato produce l'errore nel banner con i dati vecchi marcati "non aggiornati", e l'aggiornamento manuale durante uno automatico è scartato da `avviaAggiornamento`.
+Nulla dei criteri di accettazione della issue: il commento va sempre per primo (REQ-131),
+un fallimento su una qualunque delle tre chiamate ferma la sequenza e lo dice, annullare
+la conferma non fa partire nessuna chiamata, e il pulsante resta disabilitato a campo vuoto.
 
 ## Fatto in più
 
-Le funzioni `caricaAspettanoTe`, `caricaAvanzamento`, `caricaAgentiAttivi` in `index.html` sono state divise in una parte che carica i dati (aggiorna lo stato per repo) e una `render...` separata che disegna il DOM dallo stato: necessario per poter ridisegnare senza perdere i dati vecchi in caso di errore, ma tocca codice scritto per T6/T7/T8.
-
-Closes #21
+Ho generalizzato la funzione privata `richiesta` in `ui/github.js` per accettare metodo e
+corpo (prima faceva solo `GET`): necessario per le tre nuove chiamate, ma tocca codice
+scritto per T5/T6.
