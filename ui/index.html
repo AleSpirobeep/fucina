@@ -32,6 +32,11 @@
         <h2>Avanzamento</h2>
         <div id="tabelleAvanzamento"></div>
       </section>
+
+      <section id="agentiAttivi">
+        <h2>Agenti attivi</h2>
+        <div id="elencoAgentiAttivi"></div>
+      </section>
     </section>
 
     <script type="module">
@@ -41,9 +46,11 @@
         parseElencoRepo,
         classifica,
         tabellaAvanzamento,
+        agentiAttivi,
+        formattaTempoTrascorso,
         ErroreGitHub,
       } from "./lib.js";
-      import { issueAperte, issueChiuseDiRecente, prAperte } from "./github.js";
+      import { issueAperte, issueChiuseDiRecente, prAperte, runWorkflow } from "./github.js";
 
       const CHIAVE_TOKEN = "fucina.token";
       const CHIAVE_REPO = "fucina.repoTesto";
@@ -55,6 +62,7 @@
       const campoToken = document.getElementById("token");
       const erroreConfigurazione = document.getElementById("erroreConfigurazione");
       const tabelleAvanzamento = document.getElementById("tabelleAvanzamento");
+      const elencoAgentiAttivi = document.getElementById("elencoAgentiAttivi");
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
@@ -139,10 +147,59 @@
         }
       }
 
+      function costruisciSezioneAgentiAttivi(repo, agenti) {
+        const sezione = costruisciSezioneRepo(repo);
+
+        if (agenti.length === 0) {
+          const messaggio = document.createElement("p");
+          messaggio.textContent = "Nessun agente al lavoro";
+          sezione.appendChild(messaggio);
+          return sezione;
+        }
+
+        const elenco = document.createElement("ul");
+        const adesso = new Date().toISOString();
+        for (const agente of agenti) {
+          const voce = document.createElement("li");
+          const link = document.createElement("a");
+          link.href = agente.url;
+          link.textContent = agente.titolo;
+          voce.appendChild(link);
+          voce.append(` — ${formattaTempoTrascorso(agente.avviatoA, adesso)}`);
+          elenco.appendChild(voce);
+        }
+        sezione.appendChild(elenco);
+        return sezione;
+      }
+
+      async function caricaAgentiAttivi() {
+        const token = tokenSalvato();
+        const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
+        elencoAgentiAttivi.innerHTML = "";
+
+        for (const repo of repos) {
+          try {
+            const runs = await runWorkflow(token, repo);
+            elencoAgentiAttivi.appendChild(costruisciSezioneAgentiAttivi(repo, agentiAttivi(runs)));
+          } catch (errore) {
+            const sezione = costruisciSezioneRepo(repo);
+            const messaggio = document.createElement("p");
+            messaggio.setAttribute("role", "alert");
+            messaggio.textContent =
+              errore instanceof ErroreGitHub
+                ? errore.message
+                : "Errore nel caricamento degli agenti attivi.";
+            sezione.appendChild(messaggio);
+            elencoAgentiAttivi.appendChild(sezione);
+          }
+        }
+      }
+
       function mostraDashboard() {
         sezioneConfigurazione.hidden = true;
         sezioneDashboard.hidden = false;
         caricaAvanzamento();
+        caricaAgentiAttivi();
       }
 
       function mostraConfigurazione() {

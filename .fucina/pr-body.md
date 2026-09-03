@@ -1,35 +1,43 @@
-Aggiunge la tabella di avanzamento per repo (T7, REQ-120).
+Implementa T8 — la sezione "Agenti attivi" del Registro (REQ-121).
 
-- `ui/lib.js`: `COLONNE_AVANZAMENTO` (ordine e etichette delle sei colonne) e
-  `tabellaAvanzamento(classificazione)`, funzione pura che trasforma il risultato di
-  `classifica()` (T4) in colonne con conteggio ed elementi `{ titolo, url }` pronti per
-  il rendering — una colonna senza elementi ha `elementi: []` e `conteggio: 0`, non manca.
-- `ui/index.html`: per ogni repo configurato, recupera issue aperte, issue chiuse di
-  recente e PR aperte con `ui/github.js` (T5), classifica con `classifica()` e disegna una
-  tabella con intestazioni "Etichetta (conteggio)" e celle con elenco di link a GitHub, o
-  un trattino `-` quando la colonna è vuota. Ogni repo è in una `<section>` separata con
-  il nome in un `<h3>`. Un errore nel recupero di un repo mostra il messaggio invece della
-  tabella, senza bloccare gli altri repo.
+- `ui/lib.js`: due nuove funzioni pure.
+  - `agentiAttivi(runs)` filtra le run del workflow `dev-agent` (già lette da
+    `runWorkflow`, T5) a quelle in stato `in_progress` o `queued`, e le riduce a
+    `{ titolo, url, avviatoA }` — titolo preso dal titolo del run (`display_title`,
+    che GitHub imposta al titolo della issue per un workflow innescato da
+    `issues: labeled`), url del run, e istante di avvio.
+  - `formattaTempoTrascorso(avviatoA, adesso)` formatta la differenza in una stringa
+    leggibile: "meno di 1 min", "N min", "N h" o "N h M min". Non scende mai sotto
+    zero, per tollerare piccoli sfasamenti fra l'orologio del client e quello di
+    GitHub.
+- `ui/index.html`: nuova sezione "Agenti attivi" nella dashboard, una sottosezione
+  per repo (stesso pattern di "Avanzamento"): elenco di link al run col tempo
+  trascorso, o "Nessun agente al lavoro" se il repo non ha run attive. Si carica
+  insieme all'avanzamento all'apertura della dashboard, con lo stesso trattamento
+  degli errori (token scaduto, repo non raggiungibile) già usato altrove.
+- `ui/agenti-attivi.test.js`: dodici test nuovi per le due funzioni pure, inclusi i
+  casi limite (elenco vuoto, run non ancora avviata secondo l'orologio locale,
+  soglia esatta dell'ora).
 
-**Verificato con:**
-- `node --test "ui/**/*.test.js"` verde (58 test, di cui 5 nuovi in `ui/avanzamento.test.js`
-  per `tabellaAvanzamento`: ordine e etichette delle colonne, colonna vuota, conteggi,
-  mapping titolo/url per issue e PR).
+Verificato con `node --test "ui/**/*.test.js"`: 70 test, tutti verdi.
 
 ## Decisioni
 
-Nessun ADR aggiunto: l'implementazione segue la spec 002 (REQ-120) e riusa `classifica()`
-(T4) e i client (T5) senza scelte non coperte dalla specifica.
+Nessun ADR aggiunto. Non è stata necessaria una chiamata separata alle issue per
+ricavare il numero: il titolo del run già coincide col titolo della issue che lo ha
+innescato (comportamento di default di GitHub per un workflow legato a un evento
+`issues`), quindi mostro quel titolo così com'è, come richiesto dalla issue
+("dal titolo del run").
 
 ## Non fatto
 
-Nulla dei criteri di T7: i conteggi derivano direttamente da `classifica()` (già verificata
-contro `gh issue list`/`gh pr list` nei test di T4), e le colonne vuote mostrano sempre il
-trattino. La sezione "Agenti attivi" (T8) e l'aggiornamento automatico (T9) sono task
-successivi e non fanno parte di questa issue.
+Il collaudo dal vivo del criterio "avviando un run su fucina-lab compare entro un
+aggiornamento; alla fine scompare" richiede di avviare un run vero su un altro repo e
+osservare la pagina in un browser: non verificabile da qui. La logica di
+caricamento segue esattamente il pattern già in produzione per "Avanzamento"
+(stesso ciclo per repo, stessa gestione degli errori), quindi il rischio è
+contenuto, ma resta da confermare a mano.
 
 ## Fatto in più
 
-Nulla: solo `ui/lib.js`, `ui/index.html` e il nuovo `ui/avanzamento.test.js`.
-
-Closes #19
+Nulla: solo i file toccati sopra.
