@@ -257,3 +257,42 @@ export function formattaTempoTrascorso(avviatoA, adesso) {
   const minutiResto = minuti % MINUTI_ALL_ORA;
   return minutiResto === 0 ? `${ore} h` : `${ore} h ${minutiResto} min`;
 }
+
+export function formattaOra(iso) {
+  const d = new Date(iso);
+  const due = (n) => String(n).padStart(2, "0");
+  return `${due(d.getHours())}:${due(d.getMinutes())}:${due(d.getSeconds())}`;
+}
+
+// Stato per repo di una sezione della dashboard: su un errore i dati della
+// chiamata precedente restano (REQ-122 chiede di non farli sparire), solo
+// marcati come non aggiornati.
+export function creaStatoSezione() {
+  return {};
+}
+
+export function aggiornaStatoRepo(stato, repo, risultato) {
+  const precedente = stato[repo];
+  const voce = risultato.ok
+    ? { dati: risultato.dati, errore: null, nonAggiornato: false }
+    : { dati: precedente ? precedente.dati : undefined, errore: risultato.errore, nonAggiornato: true };
+  return { ...stato, [repo]: voce };
+}
+
+// Coordina i cicli di aggiornamento: `avviaAggiornamento` restituisce null se
+// uno è già in corso, così un click manuale durante il timer automatico non
+// genera un secondo giro di richieste.
+export function creaStatoAggiornamento() {
+  return { inCorso: false, ultimoAggiornamento: null };
+}
+
+export function avviaAggiornamento(stato) {
+  return stato.inCorso ? null : { ...stato, inCorso: true };
+}
+
+export function terminaAggiornamento(stato, adesso, haErrori) {
+  return {
+    inCorso: false,
+    ultimoAggiornamento: haErrori ? stato.ultimoAggiornamento : adesso,
+  };
+}
