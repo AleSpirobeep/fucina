@@ -150,3 +150,22 @@ export function classifica(issues, prs, oggi) {
 
   return risultato;
 }
+
+export const COLONNE_AVANZAMENTO = [
+  { chiave: "backlog", etichetta: "Backlog" },
+  { chiave: "pronte", etichetta: "Pronte" },
+  { chiave: "inLavorazione", etichetta: "In lavorazione" },
+  { chiave: "inRevisione", etichetta: "In revisione" },
+  { chiave: "bloccate", etichetta: "Bloccate" },
+  { chiave: "fatte", etichetta: "Fatte" },
+];
+
+export function tabellaAvanzamento(classificazione) {
+  return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
+    const elementi = (classificazione[chiave] || []).map((elemento) => ({
+      titolo: elemento.title,
+      url: elemento.html_url,
+    }));
+    return { chiave, etichetta, conteggio: elementi.length, elementi };
+  });
+}
