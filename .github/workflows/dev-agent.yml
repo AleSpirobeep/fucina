@@ -124,7 +124,7 @@ jobs:
             --model ${{ steps.cfg.outputs.modello }}
             --max-turns ${{ steps.cfg.outputs.max_turns }}
             --max-budget-usd ${{ steps.cfg.outputs.max_budget }}
-            --allowedTools ${{ steps.cfg.outputs.strumenti }}
+            --allowedTools "${{ steps.cfg.outputs.strumenti }}"
 
       - name: Apri la PR con il corpo scritto dall'agente
         if: success() && steps.tentativi.outputs.stop == 'false'

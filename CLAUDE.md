@@ -21,8 +21,12 @@
   GitHub.
 - La logica che si può testare senza browser va in `lib.js`, come funzioni pure
   esportate; `index.html` la importa come modulo ES e fa solo rendering e chiamate.
-- Ogni funzione in `lib.js` ha almeno un test in `lib.test.js`, con il runner di Node
-  (`node:test` e `node:assert`).
+- Ogni funzione in `lib.js` ha almeno un test, con il runner di Node (`node:test` e
+  `node:assert`). I test vanno in file `ui/<argomento>.test.js` — **uno nuovo per ogni
+  task**, accanto a quelli esistenti. I file di test esistenti non si modificano: il
+  guard li protegge, e il glob `ui/**/*.test.js` li raccoglie tutti.
+- Le fixture (corpi di PR, risposte dell'API) stanno in `ui/fixtures/` come file, mai
+  lette dalla rete dentro un test.
 - Il token dell'utente esiste solo in `localStorage`. Mai in un file, mai in un log.
 - Italiano nell'interfaccia e nei messaggi d'errore.
 
