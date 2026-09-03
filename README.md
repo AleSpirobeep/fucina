@@ -61,9 +61,11 @@ Legge la configurazione da `.fucina.yml`, chiave `pm` (modello, tetto di turni, 
 di spesa, attesa dei check): tutta commentata riga per riga, con default sensati se
 la chiave manca del tutto.
 
-Costa una chiamata al modello per ogni PR aperta, ogni domanda a cui risponde, e
-ogni giro sulla coda — non per ogni evento del repo: i check ancora in corso o le
-PR già giudicate non fanno partire il modello.
+Costa una chiamata al modello per ogni PR revisionata e una per ogni domanda —
+nient'altro. Rimandare check rossi o sezioni mancanti, attendere check in corso,
+avviare il task successivo, contare i tentativi, commentare, fondere e chiudere
+sono azioni del workflow, a costo zero, come un giro senza lavoro o un PM spento,
+che non scrivono nulla.
 
 ## Come si legge il lavoro degli agenti
 

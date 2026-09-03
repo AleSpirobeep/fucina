@@ -25,6 +25,15 @@ da `pm-agent.yml`):
 - `README.md`: sezione «Il PM a cicli» (22 righe) — cosa fa, come si accende e si
   spegne, dove legge la configurazione, cosa costa.
 
+**Tentativo 2**: il paragrafo sul costo è stato riscritto dopo la revisione del
+tentativo 1 (PR #64, chiusa). Il difetto: diceva che il PM costa una chiamata
+anche «per ogni giro sulla coda», mentre avviare il task successivo è l'azione
+deterministica `avvia-task` del workflow, a costo zero (SC-202, P9); e diceva «per
+ogni PR aperta» invece di «per ogni PR **revisionata**» — una PR con check rossi o
+senza le due sezioni obbligatorie è rimandata senza chiamare il modello (REQ-213,
+214), e con check in corso il PM attende, sempre senza modello (REQ-215). Il nuovo
+paragrafo elenca anche il costo zero a lavoro fermo (SC-201, REQ-201, REQ-242).
+
 Closes #49
 
 ## Come l'ho verificato
@@ -55,6 +64,11 @@ verificato con `bash -n`), YAML e Markdown, nessuna funzione JS nuova.
 
 Nessun token o valore di secret in nessun file toccato (solo nomi di secret già
 presenti: `CLAUDE_CODE_OAUTH_TOKEN`, `FUCINA_PAT`).
+
+Tutte le verifiche sono state rieseguite identiche per il tentativo 2, con lo
+stesso esito: `bash -n init.sh` esce 0, i due `yq` stampano 40 e 13, i cinque file
+sono copiati e i due richiamati a runtime sono fra questi, la suite è 150/150
+verde.
 
 ## Decisioni
 
