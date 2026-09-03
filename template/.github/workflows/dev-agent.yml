@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   implementa:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'ready-for-dev'
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'ready-for-dev' && !contains(github.event.issue.labels.*.name, 'rapporto-pm')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -180,9 +180,13 @@ jobs:
       - name: Segnala il fallimento del run
         if: failure() && steps.tentativi.outputs.stop == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.FUCINA_PAT || secrets.GITHUB_TOKEN }}
           ISSUE: ${{ github.event.issue.number || inputs.issue }}
         run: |
-          gh issue edit "$ISSUE" --remove-label in-progress
+          # Riavvio automatico: il tentativo è già stato contato. Il passo "Conta i
+          # tentativi precedenti" applica needs-human al posto di ready-for-dev quando i
+          # tentativi sono esauriti, e questo passo gira solo se il tentativo è stato
+          # contato: nessun loop infinito è possibile.
+          gh issue edit "$ISSUE" --remove-label in-progress --add-label ready-for-dev
           gh issue comment "$ISSUE" --body \
             "Il run dell'agente è terminato con errore — possibile superamento del tetto di spesa o del numero di turni. [Log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
