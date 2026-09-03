@@ -48,6 +48,8 @@ crea_label "needs-review"        "3B7DD8" "PR da revisionare"
 crea_label "changes-requested"   "D07B2C" "Revisione: servono modifiche"
 crea_label "needs-human"         "A93B2C" "Bloccata: serve una decisione umana"
 crea_label "allow-test-changes"  "6E5AA8" "Autorizza la modifica dei percorsi protetti"
+crea_label "in-coda"             "5A6E8C" "In coda: il PM la avvierà al suo turno"
+crea_label "rapporto-pm"         "2C6E49" "Issue di rapporto del PM"
 echo
 
 # --- file --------------------------------------------------------------------
@@ -73,6 +75,11 @@ copia "$TEMPLATE/.github/CODEOWNERS"                 ".github/CODEOWNERS"
 copia "$TEMPLATE/docs/decisions/0000-template.md"    "docs/decisions/0000-template.md"
 copia "$TEMPLATE/CLAUDE.md"                          "CLAUDE.md"
 copia "$FUCINA_DIR/plugin/skills/dev-agent/SKILL.md" ".claude/skills/dev-agent/SKILL.md"
+copia "$TEMPLATE/.github/workflows/pm-agent.yml"     ".github/workflows/pm-agent.yml"
+copia "$TEMPLATE/scripts/pm-coda.js"                 "scripts/pm-coda.js"
+copia "$TEMPLATE/scripts/raccogli-stato.sh"          "scripts/raccogli-stato.sh"
+copia "$TEMPLATE/scripts/pm.ps1"                     "scripts/pm.ps1"
+copia "$FUCINA_DIR/plugin/skills/pm-agent/SKILL.md"  ".claude/skills/pm-agent/SKILL.md"
 echo
 
 # CODEOWNERS con l'utente giusto, solo se l'abbiamo appena creato
@@ -92,7 +99,7 @@ fi
 # --- passi manuali -----------------------------------------------------------
 
 cat <<FINE
-$(giallo "Restano quattro cose che init non può fare al posto tuo:")
+$(giallo "Restano cinque cose che init non può fare al posto tuo:")
 
   1. Installa la GitHub App di Claude su questo repo:
      https://github.com/apps/claude
@@ -115,6 +122,13 @@ $(giallo "Restano quattro cose che init non può fare al posto tuo:")
      zero approvazioni richieste (le PR aperte col tuo PAT risultano tue,
      e non puoi approvare le tue PR: il cancello è il merge manuale),
      enforce_admins false. Nessun auto-merge, nessun bypass per gli agenti.
+
+  5. Il PM (workflow pm-agent.yml) è installato spento. Il login gh locale deve
+     avere lo scope "workflow" per poterlo accendere: se manca, esegui
+       gh auth refresh -s workflow
+     Per accenderlo: scripts/pm.ps1 avvia (spegnerlo: scripts/pm.ps1 ferma).
+     Le issue dei task vanno create con la label "in-coda" e un titolo
+     "T001: ..." — è così che il PM le trova e le ordina.
 
 $(verde "Poi controlla la configurazione in .fucina.yml: test_command è obbligatorio.")
 FINE
