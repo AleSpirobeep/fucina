@@ -43,6 +43,30 @@ La cartella `plugin/` esiste per un impacchettamento futuro come plugin vero: in
 la skill viaggia dentro il repo di destinazione, che è più semplice da collaudare e
 lascia il ruolo versionato insieme al codice che governa.
 
+## Il PM a cicli
+
+Un secondo ruolo, `pm-agent`, che porta avanti la coda dei task al posto di una
+persona: prende la prossima issue `in-coda`, la avvia (`ready-for-dev`), revisiona
+ogni PR che l'agente sviluppatore apre contro la specifica, la fonde o la rimanda
+con un commento, risponde alle domande che trova in `needs-human`, e riferisce ad
+Alessio in un'unica issue con label `rapporto-pm` — mai una nuova per ciclo.
+
+`init` lo installa spento: nessun evento del repo lo fa partire finché non lo
+accendi con `scripts/pm.ps1 avvia` (richiede lo scope `workflow` sul login `gh`
+locale). Si spegne con `scripts/pm.ps1 ferma`: un'esecuzione già in corso finisce
+il ciclo, ma nessuna nuova ne parte. `scripts/pm.ps1 stato` mostra se è acceso, la
+coda, le PR da revisionare e le domande in attesa.
+
+Legge la configurazione da `.fucina.yml`, chiave `pm` (modello, tetto di turni, tetto
+di spesa, attesa dei check): tutta commentata riga per riga, con default sensati se
+la chiave manca del tutto.
+
+Costa una chiamata al modello per ogni PR revisionata e una per ogni domanda —
+nient'altro. Rimandare check rossi o sezioni mancanti, attendere check in corso,
+avviare il task successivo, contare i tentativi, commentare, fondere e chiudere
+sono azioni del workflow, a costo zero, come un giro senza lavoro o un PM spento,
+che non scrivono nulla.
+
 ## Come si legge il lavoro degli agenti
 
 - Le decisioni prese senza chiedere finiscono in `docs/decisions/`, un file per
