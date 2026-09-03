@@ -1,28 +1,31 @@
-Implementa la sezione **"Aspettano te"** (REQ-110, REQ-111, REQ-112, REQ-113) in cima alla dashboard: per ogni repo configurato, le issue con `needs-human` (con in linea l'ultimo commento) e le PR con `needs-review` (con le sezioni **Non fatto**/**Fatto in più** estratte dal corpo e lo stato dei check verde/rosso/in attesa). Se la coda è vuota su tutti i repo, la sezione mostra "Niente aspetta te".
+Implementa T9 (REQ-122): aggiornamento automatico della dashboard ogni 60 secondi, pulsante manuale "Aggiorna", ora dell'ultimo aggiornamento riuscito e riquadro degli errori in cima, senza far sparire i dati precedenti quando una chiamata fallisce.
 
-Due nuove funzioni pure in `ui/lib.js`, che riusano quanto fatto da T3 (client GitHub) e T5 (`estraiSezioni`, `classifica`):
-- `ultimoCommento(commenti)`: corpo dell'ultimo commento di un elenco, o `null` se vuoto.
-- `elementoPrCoda(pr)`: numero, titolo, url e le due sezioni (`nonFatto`, `fattoInPiu`) estratte dal corpo della PR con `estraiSezioni`.
+## Cosa cambia
 
-`ui/index.html` aggiunge la sezione `#aspettanoTe`: per repo, chiama `classifica()` su issue aperte e PR aperte per ottenere `bloccate`/`inRevisione`, poi per ogni issue bloccata recupera i commenti (`commentiIssue`) e per ogni PR in revisione lo stato dei check (`statoCheckPr` sulla `head.sha`). Ogni elemento porta il link a GitHub (REQ-111). Un errore su un repo mostra il messaggio d'errore invece di lasciar intendere una coda vuota; "Niente aspetta te" compare solo quando nessun repo ha elementi e nessuno è andato in errore.
+- `ui/lib.js`: nuove funzioni pure
+  - `formattaOra` — formatta un timestamp ISO come `HH:MM:SS`.
+  - `creaStatoSezione` / `aggiornaStatoRepo` — stato per repo di una sezione della dashboard: su un errore mantengono i dati dell'ultima chiamata riuscita e marcano la voce `nonAggiornato`.
+  - `creaStatoAggiornamento` / `avviaAggiornamento` / `terminaAggiornamento` — macchina a stati del ciclo di aggiornamento: `avviaAggiornamento` restituisce `null` se un ciclo è già in corso, così un click sul pulsante manuale mentre gira quello automatico non genera un secondo giro di richieste; `terminaAggiornamento` registra l'ora solo se il ciclo non ha avuto errori.
+- `ui/index.html`:
+  - le tre sezioni (Aspettano te, Avanzamento, Agenti attivi) ora tengono lo stato per repo tra un ciclo e l'altro invece di ricostruirlo da zero: se una chiamata fallisce, la sezione di quel repo resta con l'ultimo contenuto valido e un messaggio "Dati non aggiornati: ..." in testa.
+  - nuovo pulsante "Aggiorna", etichetta "Ultimo aggiornamento riuscito: HH:MM:SS" e un riquadro `#banner` in cima che elenca repo e sezione di ogni errore in corso.
+  - `setInterval` da 60 secondi avviato una sola volta all'ingresso in dashboard; sia il timer che il pulsante chiamano la stessa `aggiorna()`, che usa `avviaAggiornamento` per evitare richieste doppie in sovrapposizione.
 
-**Verificato con:** `node --test "ui/**/*.test.js"` — 83/83 verdi. I nuovi test sono in `ui/aspettano-te.test.js`:
-- `ultimoCommento` su elenco vuoto/assente (`null`), su un elenco semplice, e sui commenti reali della issue 1 di `fucina-lab` (fixture `ui/fixtures/issue-1-fucina-lab-commenti.json`, presi da `gh issue view 1 --repo AleSpirobeep/fucina-lab --comments`): restituisce il commento sui tentativi esauriti, non il primo della lista;
-- `elementoPrCoda` sul corpo reale della PR #6 di `fucina-lab` (fixture già esistente `ui/fixtures/pr-body-6.md`), e su un corpo senza sezioni (`nonFatto`/`fattoInPiu` a `null`);
-- `classifica` su elenchi vuoti conferma `bloccate`/`inRevisione` vuoti (base della coda vuota).
+## Come l'ho verificato
 
-La combinazione con `statoCheckPr` (che richiede una chiamata di rete per il check status) e il rendering non sono testabili senza browser/rete: verificati leggendo il codice contro REQ-112 (tre soli stati, nessun check elencato) e REQ-113.
+- `node --test "ui/**/*.test.js"` — 95 test, tutti verdi (11 nuovi in `ui/aggiornamento.test.js` per `formattaOra`, `aggiornaStatoRepo`, e la macchina a stati di `avviaAggiornamento`/`terminaAggiornamento`, incluso il caso di doppio avvio rifiutato).
+- La logica di rete/DOM (timer, click, banner) non è testabile senza browser: è stata verificata a lettura di codice, seguendo lo stesso schema già in uso in `index.html` per T6/T7/T8.
 
 ## Decisioni
 
-Nessun ADR nuovo: la divisione `lib.js`/`github.js` e gli endpoint da usare erano già decisi nell'ADR `2026-09-03-1131-client-github-check-run-e-struttura.md` (T5); qui la coda riusa semplicemente `commentiIssue` e `statoCheckPr` senza toccare `fetch`.
+Nessun ADR aggiunto: le scelte (dedup con `avviaAggiornamento` che restituisce `null`, timestamp aggiornato solo sui cicli senza errori, stato per repo invece che per sezione intera) sono implementazione diretta di REQ-122 e non cambiano comportamento visibile oltre a quanto richiesto dall'issue.
 
 ## Non fatto
 
-Nulla: i tre criteri di accettazione della issue sono coperti (issue 1 di `fucina-lab` con il suo ultimo commento, PR `needs-review` con le due sezioni, messaggio "Niente aspetta te" a coda vuota).
+Nulla dei criteri di accettazione della issue: l'ora cambia ogni minuto tramite il timer, un token revocato produce l'errore nel banner con i dati vecchi marcati "non aggiornati", e l'aggiornamento manuale durante uno automatico è scartato da `avviaAggiornamento`.
 
 ## Fatto in più
 
-Nulla: solo `ui/lib.js`, `ui/index.html`, il nuovo file di test `ui/aspettano-te.test.js` e la nuova fixture `ui/fixtures/issue-1-fucina-lab-commenti.json` sono stati toccati.
+Le funzioni `caricaAspettanoTe`, `caricaAvanzamento`, `caricaAgentiAttivi` in `index.html` sono state divise in una parte che carica i dati (aggiorna lo stato per repo) e una `render...` separata che disegna il DOM dallo stato: necessario per poter ridisegnare senza perdere i dati vecchi in caso di errore, ma tocca codice scritto per T6/T7/T8.
 
-Closes #18
+Closes #21

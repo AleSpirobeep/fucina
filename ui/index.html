@@ -27,6 +27,9 @@
       <h2>Dashboard</h2>
       <button id="apriConfigurazione">Configurazione</button>
       <button id="dimenticaToken">Dimentica il token</button>
+      <button id="aggiornaOra">Aggiorna</button>
+      <p id="ultimoAggiornamento"></p>
+      <div id="banner" role="alert" hidden></div>
 
       <section id="aspettanoTe">
         <h2>Aspettano te</h2>
@@ -56,6 +59,12 @@
         ultimoCommento,
         elementoPrCoda,
         ErroreGitHub,
+        formattaOra,
+        creaStatoSezione,
+        aggiornaStatoRepo,
+        creaStatoAggiornamento,
+        avviaAggiornamento,
+        terminaAggiornamento,
       } from "./lib.js";
       import {
         issueAperte,
@@ -78,9 +87,33 @@
       const tabelleAvanzamento = document.getElementById("tabelleAvanzamento");
       const elencoAgentiAttivi = document.getElementById("elencoAgentiAttivi");
       const elencoAspettanoTe = document.getElementById("elencoAspettanoTe");
+      const pulsanteAggiorna = document.getElementById("aggiornaOra");
+      const etichettaUltimoAggiornamento = document.getElementById("ultimoAggiornamento");
+      const banner = document.getElementById("banner");
+
+      const INTERVALLO_AGGIORNAMENTO_MS = 60 * 1000;
+
+      let statoAggiornamento = creaStatoAggiornamento();
+      let statoAspettanoTe = creaStatoSezione();
+      let statoAvanzamentoRepo = creaStatoSezione();
+      let statoAgentiAttiviRepo = creaStatoSezione();
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
+      }
+
+      function aggiungiMessaggioErrore(sezione, messaggio) {
+        const p = document.createElement("p");
+        p.setAttribute("role", "alert");
+        p.textContent = messaggio;
+        sezione.appendChild(p);
+      }
+
+      function marcaSezioneNonAggiornata(sezione, errore) {
+        const p = document.createElement("p");
+        p.setAttribute("role", "alert");
+        p.textContent = `Dati non aggiornati: ${errore}`;
+        sezione.insertBefore(p, sezione.children[1] || null);
       }
 
       function costruisciSezioneRepo(repo) {
@@ -130,10 +163,27 @@
         return sezione;
       }
 
+      function renderAvanzamento(repos) {
+        tabelleAvanzamento.innerHTML = "";
+        for (const repo of repos) {
+          const voce = statoAvanzamentoRepo[repo];
+          if (!voce) continue;
+
+          if (voce.dati) {
+            const sezione = costruisciTabellaRepo(repo, voce.dati);
+            if (voce.nonAggiornato) marcaSezioneNonAggiornata(sezione, voce.errore);
+            tabelleAvanzamento.appendChild(sezione);
+          } else {
+            const sezione = costruisciSezioneRepo(repo);
+            aggiungiMessaggioErrore(sezione, voce.errore);
+            tabelleAvanzamento.appendChild(sezione);
+          }
+        }
+      }
+
       async function caricaAvanzamento() {
         const token = tokenSalvato();
         const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
-        tabelleAvanzamento.innerHTML = "";
 
         for (const repo of repos) {
           try {
@@ -147,19 +197,23 @@
               prRepo,
               new Date().toISOString(),
             );
-            tabelleAvanzamento.appendChild(costruisciTabellaRepo(repo, classificazione));
+            statoAvanzamentoRepo = aggiornaStatoRepo(statoAvanzamentoRepo, repo, {
+              ok: true,
+              dati: classificazione,
+            });
           } catch (errore) {
-            const sezione = costruisciSezioneRepo(repo);
-            const messaggio = document.createElement("p");
-            messaggio.setAttribute("role", "alert");
-            messaggio.textContent =
+            const messaggio =
               errore instanceof ErroreGitHub
                 ? errore.message
                 : "Errore nel caricamento dell'avanzamento.";
-            sezione.appendChild(messaggio);
-            tabelleAvanzamento.appendChild(sezione);
+            statoAvanzamentoRepo = aggiornaStatoRepo(statoAvanzamentoRepo, repo, {
+              ok: false,
+              errore: messaggio,
+            });
           }
         }
+
+        renderAvanzamento(repos);
       }
 
       function costruisciSezioneAgentiAttivi(repo, agenti) {
@@ -187,27 +241,48 @@
         return sezione;
       }
 
+      function renderAgentiAttivi(repos) {
+        elencoAgentiAttivi.innerHTML = "";
+        for (const repo of repos) {
+          const voce = statoAgentiAttiviRepo[repo];
+          if (!voce) continue;
+
+          if (voce.dati) {
+            const sezione = costruisciSezioneAgentiAttivi(repo, voce.dati);
+            if (voce.nonAggiornato) marcaSezioneNonAggiornata(sezione, voce.errore);
+            elencoAgentiAttivi.appendChild(sezione);
+          } else {
+            const sezione = costruisciSezioneRepo(repo);
+            aggiungiMessaggioErrore(sezione, voce.errore);
+            elencoAgentiAttivi.appendChild(sezione);
+          }
+        }
+      }
+
       async function caricaAgentiAttivi() {
         const token = tokenSalvato();
         const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
-        elencoAgentiAttivi.innerHTML = "";
 
         for (const repo of repos) {
           try {
             const runs = await runWorkflow(token, repo);
-            elencoAgentiAttivi.appendChild(costruisciSezioneAgentiAttivi(repo, agentiAttivi(runs)));
+            statoAgentiAttiviRepo = aggiornaStatoRepo(statoAgentiAttiviRepo, repo, {
+              ok: true,
+              dati: agentiAttivi(runs),
+            });
           } catch (errore) {
-            const sezione = costruisciSezioneRepo(repo);
-            const messaggio = document.createElement("p");
-            messaggio.setAttribute("role", "alert");
-            messaggio.textContent =
+            const messaggio =
               errore instanceof ErroreGitHub
                 ? errore.message
                 : "Errore nel caricamento degli agenti attivi.";
-            sezione.appendChild(messaggio);
-            elencoAgentiAttivi.appendChild(sezione);
+            statoAgentiAttiviRepo = aggiornaStatoRepo(statoAgentiAttiviRepo, repo, {
+              ok: false,
+              errore: messaggio,
+            });
           }
         }
+
+        renderAgentiAttivi(repos);
       }
 
       function costruisciVoceIssueBloccata(issue, commento) {
@@ -243,12 +318,48 @@
         return voce;
       }
 
+      function renderAspettanoTe(repos) {
+        elencoAspettanoTe.innerHTML = "";
+        let haElementi = false;
+
+        for (const repo of repos) {
+          const voce = statoAspettanoTe[repo];
+          if (!voce) continue;
+
+          if (voce.dati) {
+            const { issueBloccate, prInRevisione } = voce.dati;
+            if (issueBloccate.length === 0 && prInRevisione.length === 0) continue;
+            haElementi = true;
+
+            const sezione = costruisciSezioneRepo(repo);
+            const elenco = document.createElement("ul");
+            for (const { issue, commento } of issueBloccate) {
+              elenco.appendChild(costruisciVoceIssueBloccata(issue, commento));
+            }
+            for (const { elemento, statoCheck } of prInRevisione) {
+              elenco.appendChild(costruisciVocePrInRevisione(elemento, statoCheck));
+            }
+            sezione.appendChild(elenco);
+            if (voce.nonAggiornato) marcaSezioneNonAggiornata(sezione, voce.errore);
+            elencoAspettanoTe.appendChild(sezione);
+          } else {
+            haElementi = true;
+            const sezione = costruisciSezioneRepo(repo);
+            aggiungiMessaggioErrore(sezione, voce.errore);
+            elencoAspettanoTe.appendChild(sezione);
+          }
+        }
+
+        if (!haElementi) {
+          const messaggio = document.createElement("p");
+          messaggio.textContent = "Niente aspetta te";
+          elencoAspettanoTe.appendChild(messaggio);
+        }
+      }
+
       async function caricaAspettanoTe() {
         const token = tokenSalvato();
         const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
-        elencoAspettanoTe.innerHTML = "";
-        let haElementi = false;
-        let haErrore = false;
 
         for (const repo of repos) {
           try {
@@ -257,55 +368,94 @@
               prAperte(token, repo),
             ]);
             const classificazione = classifica(issueAperteRepo, prRepo, new Date().toISOString());
-            const issueBloccate = classificazione.bloccate;
-            const prInRevisione = classificazione.inRevisione;
 
-            if (issueBloccate.length === 0 && prInRevisione.length === 0) continue;
-            haElementi = true;
-
-            const sezione = costruisciSezioneRepo(repo);
-            const elenco = document.createElement("ul");
-
-            for (const issue of issueBloccate) {
+            const issueBloccate = [];
+            for (const issue of classificazione.bloccate) {
               const commenti = await commentiIssue(token, repo, issue.number);
-              elenco.appendChild(costruisciVoceIssueBloccata(issue, ultimoCommento(commenti)));
+              issueBloccate.push({ issue, commento: ultimoCommento(commenti) });
             }
 
-            for (const pr of prInRevisione) {
+            const prInRevisione = [];
+            for (const pr of classificazione.inRevisione) {
               const statoCheck = await statoCheckPr(token, repo, pr.head.sha);
-              elenco.appendChild(costruisciVocePrInRevisione(elementoPrCoda(pr), statoCheck));
+              prInRevisione.push({ elemento: elementoPrCoda(pr), statoCheck });
             }
 
-            sezione.appendChild(elenco);
-            elencoAspettanoTe.appendChild(sezione);
+            statoAspettanoTe = aggiornaStatoRepo(statoAspettanoTe, repo, {
+              ok: true,
+              dati: { issueBloccate, prInRevisione },
+            });
           } catch (errore) {
-            haErrore = true;
-            const sezione = costruisciSezioneRepo(repo);
-            const messaggio = document.createElement("p");
-            messaggio.setAttribute("role", "alert");
-            messaggio.textContent =
-              errore instanceof ErroreGitHub
-                ? errore.message
-                : "Errore nel caricamento della coda.";
-            sezione.appendChild(messaggio);
-            elencoAspettanoTe.appendChild(sezione);
+            const messaggio =
+              errore instanceof ErroreGitHub ? errore.message : "Errore nel caricamento della coda.";
+            statoAspettanoTe = aggiornaStatoRepo(statoAspettanoTe, repo, {
+              ok: false,
+              errore: messaggio,
+            });
           }
         }
 
-        if (!haElementi && !haErrore) {
-          const messaggio = document.createElement("p");
-          messaggio.textContent = "Niente aspetta te";
-          elencoAspettanoTe.appendChild(messaggio);
+        renderAspettanoTe(repos);
+      }
+
+      function aggiornaEtichettaUltimoAggiornamento() {
+        etichettaUltimoAggiornamento.textContent = statoAggiornamento.ultimoAggiornamento
+          ? `Ultimo aggiornamento riuscito: ${formattaOra(statoAggiornamento.ultimoAggiornamento)}`
+          : "Nessun aggiornamento riuscito finora.";
+      }
+
+      function aggiornaBanner() {
+        const errori = [];
+        for (const [nomeSezione, stato] of [
+          ["Aspettano te", statoAspettanoTe],
+          ["Avanzamento", statoAvanzamentoRepo],
+          ["Agenti attivi", statoAgentiAttiviRepo],
+        ]) {
+          for (const [repo, voce] of Object.entries(stato)) {
+            if (voce.errore) errori.push(`${repo} (${nomeSezione}): ${voce.errore}`);
+          }
+        }
+
+        if (errori.length === 0) {
+          banner.hidden = true;
+          banner.textContent = "";
+        } else {
+          banner.hidden = false;
+          banner.textContent = errori.join(" · ");
         }
       }
+
+      async function aggiorna() {
+        const nuovoStato = avviaAggiornamento(statoAggiornamento);
+        if (!nuovoStato) return;
+        statoAggiornamento = nuovoStato;
+        pulsanteAggiorna.disabled = true;
+
+        await Promise.all([caricaAspettanoTe(), caricaAvanzamento(), caricaAgentiAttivi()]);
+
+        const haErrori =
+          Object.values(statoAspettanoTe).some((voce) => voce.errore) ||
+          Object.values(statoAvanzamentoRepo).some((voce) => voce.errore) ||
+          Object.values(statoAgentiAttiviRepo).some((voce) => voce.errore);
+
+        statoAggiornamento = terminaAggiornamento(statoAggiornamento, new Date().toISOString(), haErrori);
+        pulsanteAggiorna.disabled = false;
+        aggiornaEtichettaUltimoAggiornamento();
+        aggiornaBanner();
+      }
+
+      let intervalloAggiornamento = null;
 
       function mostraDashboard() {
         sezioneConfigurazione.hidden = true;
         sezioneDashboard.hidden = false;
-        caricaAspettanoTe();
-        caricaAvanzamento();
-        caricaAgentiAttivi();
+        aggiorna();
+        if (intervalloAggiornamento === null) {
+          intervalloAggiornamento = setInterval(aggiorna, INTERVALLO_AGGIORNAMENTO_MS);
+        }
       }
+
+      pulsanteAggiorna.addEventListener("click", aggiorna);
 
       function mostraConfigurazione() {
         erroreConfigurazione.textContent = "";
