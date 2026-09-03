@@ -1,36 +1,42 @@
-Aggiunge `classifica(issues, prs, oggi)` in `ui/lib.js`: una funzione pura che smista issue
-e PR nelle sei colonne dell'avanzamento (REQ-120, REQ-141, OP-204).
+Aggiunge il client per l'API di GitHub richiesto dalla T5: funzioni che leggono issue
+aperte e chiuse di recente, PR aperte, commenti di una issue, stato combinato dei check
+di una PR e run del workflow `dev-agent` (REQ-102, REQ-122 parte).
 
-- `backlog`: issue aperte senza label di stato (`ready-for-dev`, `in-progress`, `needs-human`).
-- `pronte`: issue aperte con `ready-for-dev`.
-- `inLavorazione`: issue aperte con `in-progress`.
-- `inRevisione`: PR aperte con `needs-review`.
-- `bloccate`: issue aperte con `needs-human`.
-- `fatte`: issue chiuse negli ultimi 14 giorni (finestra da OP-204), inclusa la chiusura
-  esattamente 14 giorni fa.
+- **Parte pura, in `ui/lib.js`**: costruzione delle URL (`urlIssueRepo`, `urlPrRepo`,
+  `urlCommentiIssue`, `urlStatoCheckPr`, `urlRunWorkflow`), interpretazione dello stato
+  combinato dei check (`interpretaStatoCheck`: `success` → verde, `failure`/`error` →
+  rosso, tutto il resto → in attesa), interpretazione degli errori HTTP
+  (`interpretaErroreHttp`: 401 → "Token non valido o scaduto.", 404 → nomina il repo non
+  raggiungibile, altrimenti un messaggio generico col codice), calcolo di una data ISO a
+  N giorni da oggi (`dataIsoGiorniFa`) e la classe `ErroreGitHub`.
+- **Funzioni sottili, nel nuovo file `ui/github.js`**: `issueAperte`,
+  `issueChiuseDiRecente`, `prAperte`, `commentiIssue`, `statoCheckPr`, `runWorkflow`.
+  Condividono un'unica funzione interna `richiediGitHub` che manda l'header
+  `Authorization: Bearer <token>` solo verso `api.github.com`, rifiuta subito se il
+  token manca, e lancia `ErroreGitHub` su ogni risposta non `ok` — mai un fallimento
+  silenzioso.
 
-Se un'issue ha più label di stato, vince la più avanzata nell'ordine
-`needs-human > in-progress > ready-for-dev`. Le PR non finiscono mai in backlog, nemmeno
-se compaiono mischiate nell'elenco `issues` (come fa l'endpoint `/issues` di GitHub, che
-include anche le PR con la chiave `pull_request`).
+Verificato con: `node --test "ui/**/*.test.js"` — 49 test verdi, 24 nuovi in
+`ui/github.test.js` (parte pura: URL, interpretazione degli stati e degli errori, date;
+parte fetch: `fetch` globale sostituito con un finto in ogni test, nessuna chiamata di
+rete vera, verificati URL, header `Authorization`, propagazione del corpo della
+risposta, e gli errori su token mancante, 401 e 404).
 
-Nessun accesso alla rete, nessun DOM: solo trasformazione di array in ingresso.
-
-Verificato con: `node --test "ui/**/*.test.js"` — 26 test verdi, 13 nuovi in
-`ui/classifica.test.js` (uno per colonna, il caso delle due label, i due casi limite sui
-14 giorni, la PR mischiata nell'elenco issue, la PR chiusa, l'issue chiusa senza
-`closed_at`).
-
-Closes #16.
+Closes #17.
 
 ## Decisioni
-Nessun ADR aggiunto: la spec 002 e la issue definivano già le sei colonne, l'ordine di
-priorità delle label e la finestra dei 14 giorni (OP-204), senza punti ambigui da
-decidere.
+Un ADR: `docs/decisions/2026-09-03-1130-client-github-endpoint-e-struttura.md`. Copre
+le scelte non coperte dalla spec: due chiamate separate per issue aperte/chiuse di
+recente invece di una con `state=all`, l'endpoint "Combined status" per i check invece
+dei check-runs singoli, e la divisione tra `lib.js` (pura) e `ui/github.js` (fetch) —
+quest'ultima esplicitamente permessa dal testo della issue.
 
 ## Non fatto
-Nulla rispetto ai criteri di accettazione della issue.
+`ui/github.js` non è ancora importato da `index.html`: la issue #17 chiedeva il client,
+non il suo collegamento alla dashboard. Quel collegamento è compito dei task successivi
+(T6 "Aspettano te", T7 "Avanzamento", T8 "Agenti attivi" in
+`specs/002-registro/tasks.md`), che dipendono esplicitamente da questa T5.
 
 ## Fatto in più
-Nulla: solo `ui/lib.js` (la funzione `classifica` e i suoi helper privati) e il nuovo file
-di test `ui/classifica.test.js`.
+Nulla: solo `ui/lib.js` (nuove funzioni pure, in coda al file), il nuovo `ui/github.js`,
+il nuovo `ui/github.test.js` e l'ADR sopra citato.
