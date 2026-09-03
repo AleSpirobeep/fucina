@@ -1,39 +1,36 @@
-Implementa T2 della spec 002 (REQ-101, REQ-102, REQ-103): la configurazione iniziale
-del Registro (elenco repo e token in `localStorage`), con le due correzioni chieste
-dal PM dopo la revisione della PR #27.
+Aggiunge `classifica(issues, prs, oggi)` in `ui/lib.js`: una funzione pura che smista issue
+e PR nelle sei colonne dell'avanzamento (REQ-120, REQ-141, OP-204).
 
-- `ui/lib.js`: nuove funzioni pure `parseElencoRepo`, `validaRepo`, `validaElencoRepo`,
-  `configurazioneValida`. `validaElencoRepo` rifiuta esplicitamente l'elenco vuoto e un
-  testo di sole righe vuote/spazi, restituendo `{ ok: false, repos: [], errore }`.
-- `ui/configurazione.test.js` (nuovo file, non ho toccato `ui/lib.test.js`): 13 test
-  per le nuove funzioni, inclusi i due casi di elenco vuoto richiesti dal PM.
-- `ui/index.html`: al primo avvio mostra il modulo di configurazione; dopo un
-  salvataggio valido (repo validi + token) mostra la dashboard; ai successivi avvii
-  parte dalla dashboard perché la condizione è la presenza del token in
-  `localStorage`. Un elenco repo vuoto o di sole righe vuote non salva nulla e mostra
-  "Inserisci almeno un repo." in italiano. Il pulsante "Configurazione" riapre il
-  modulo, "Dimentica il token" cancella solo il token e torna al modulo. Il campo
-  token non è mai precompilato (vedi ADR) e il suo segnaposto è calcolato ogni volta
-  che il modulo si apre: con un token già salvato invita a lasciarlo vuoto per non
-  cambiarlo, senza token dice solo "Token personale di GitHub". Il token non è mai
-  scritto in `console.log` né in `innerHTML`.
+- `backlog`: issue aperte senza label di stato (`ready-for-dev`, `in-progress`, `needs-human`).
+- `pronte`: issue aperte con `ready-for-dev`.
+- `inLavorazione`: issue aperte con `in-progress`.
+- `inRevisione`: PR aperte con `needs-review`.
+- `bloccate`: issue aperte con `needs-human`.
+- `fatte`: issue chiuse negli ultimi 14 giorni (finestra da OP-204), inclusa la chiusura
+  esattamente 14 giorni fa.
 
-Verificato con `node --test "ui/**/*.test.js"`: 14/14 verdi (13 nuovi + 1 esistente).
+Se un'issue ha più label di stato, vince la più avanzata nell'ordine
+`needs-human > in-progress > ready-for-dev`. Le PR non finiscono mai in backlog, nemmeno
+se compaiono mischiate nell'elenco `issues` (come fa l'endpoint `/issues` di GitHub, che
+include anche le PR con la chiave `pull_request`).
 
-Closes #14
+Nessun accesso alla rete, nessun DOM: solo trasformazione di array in ingresso.
+
+Verificato con: `node --test "ui/**/*.test.js"` — 26 test verdi, 13 nuovi in
+`ui/classifica.test.js` (uno per colonna, il caso delle due label, i due casi limite sui
+14 giorni, la PR mischiata nell'elenco issue, la PR chiusa, l'issue chiusa senza
+`closed_at`).
+
+Closes #16.
 
 ## Decisioni
-- [`docs/decisions/2026-09-03-1105-token-mai-precompilato.md`](../docs/decisions/2026-09-03-1105-token-mai-precompilato.md):
-  il campo token nel modulo non è mai precompilato con il valore salvato, per
-  rispettare alla lettera "il token non compare mai nell'HTML"; vuoto al salvataggio
-  = mantieni il token attuale; il segnaposto riflette la presenza effettiva del
-  token al momento in cui il modulo si apre, così resta corretto anche subito dopo
-  "Dimentica il token".
+Nessun ADR aggiunto: la spec 002 e la issue definivano già le sei colonne, l'ordine di
+priorità delle label e la finestra dei 14 giorni (OP-204), senza punti ambigui da
+decidere.
 
 ## Non fatto
-Nulla dei criteri di T2, inclusi i due punti aggiuntivi del PM. REQ-110 e successivi
-(coda, avanzamento, comando) sono fuori dal perimetro di questa issue.
+Nulla rispetto ai criteri di accettazione della issue.
 
 ## Fatto in più
-Nulla oltre ai file necessari: `ui/lib.js`, `ui/configurazione.test.js`,
-`ui/index.html`, l'ADR e questo file.
+Nulla: solo `ui/lib.js` (la funzione `classifica` e i suoi helper privati) e il nuovo file
+di test `ui/classifica.test.js`.
