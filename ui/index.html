@@ -2,50 +2,333 @@
 <html lang="it">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <title>Registro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+
+        --font-titoli: "Archivo", "Segoe UI", Arial, sans-serif;
+        --font-testo: "Newsreader", Georgia, "Times New Roman", serif;
+        --font-dati: "JetBrains Mono", Consolas, "Courier New", monospace;
+
+        --spazio-1: 4px;
+        --spazio-2: 8px;
+        --spazio-3: 16px;
+        --spazio-4: 24px;
+        --spazio-5: 32px;
+        --raggio: 8px;
+
+        --colore-sfondo: #eef2f0;
+        --colore-superficie: #ffffff;
+        --colore-superficie-alt: #e2e9e5;
+        --colore-testo: #1c2624;
+        --colore-testo-secondario: #51605a;
+        --colore-bordo: #cad6d0;
+
+        --colore-petrolio: #0e6a6e;
+        --colore-petrolio-testo: #08494c;
+        --colore-petrolio-sfondo: #dcf0ef;
+
+        --colore-ambra: #a8660c;
+        --colore-ambra-testo: #6b4409;
+        --colore-ambra-sfondo: #fbecd2;
+        --colore-ambra-bordo: #e3a94f;
+
+        --colore-verde: #2e7d4f;
+        --colore-rosso: #b3261e;
+
+        --ombra-scheda: 0 1px 3px rgba(15, 35, 30, 0.08);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --colore-sfondo: #101513;
+          --colore-superficie: #1a211f;
+          --colore-superficie-alt: #212a27;
+          --colore-testo: #e6ede9;
+          --colore-testo-secondario: #a3b3ac;
+          --colore-bordo: #303d38;
+
+          --colore-petrolio: #57c2c4;
+          --colore-petrolio-testo: #8fdadb;
+          --colore-petrolio-sfondo: #16302f;
+
+          --colore-ambra: #eab363;
+          --colore-ambra-testo: #f3cd94;
+          --colore-ambra-sfondo: #3a2c14;
+          --colore-ambra-bordo: #8a611f;
+
+          --colore-verde: #6bcb92;
+          --colore-rosso: #f0847c;
+
+          --ombra-scheda: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--colore-sfondo);
+        color: var(--colore-testo);
+        font-family: var(--font-testo);
+        font-size: 16px;
+        line-height: 1.5;
+        overflow-wrap: break-word;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: var(--font-titoli);
+        font-weight: 600;
+        color: var(--colore-testo);
+        margin: 0 0 var(--spazio-3);
+      }
+
+      h1 {
+        font-size: 1.75rem;
+        letter-spacing: 0.01em;
+      }
+      h2 {
+        font-size: 1.2rem;
+      }
+      h3 {
+        font-size: 1.02rem;
+      }
+
+      a {
+        color: var(--colore-petrolio-testo);
+      }
+      a:hover {
+        color: var(--colore-petrolio);
+      }
+
+      .pagina {
+        max-width: 1440px;
+        min-width: 1200px;
+        margin: 0 auto;
+        padding: var(--spazio-5) var(--spazio-5) 64px;
+      }
+
+      .barra-controlli {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--spazio-3);
+        margin-bottom: var(--spazio-4);
+      }
+
+      .controlli {
+        display: flex;
+        gap: var(--spazio-2);
+        flex-wrap: wrap;
+      }
+
+      .testo-dati {
+        font-family: var(--font-dati);
+        font-size: 0.8rem;
+        color: var(--colore-testo-secondario);
+        margin: 0;
+      }
+
+      button,
+      .pulsante {
+        font-family: var(--font-dati);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: 1px solid var(--colore-bordo);
+        background: var(--colore-superficie);
+        color: var(--colore-petrolio-testo);
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--colore-petrolio-sfondo);
+        border-color: var(--colore-petrolio);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: var(--colore-superficie);
+        border-color: var(--colore-bordo);
+      }
+
+      .pulsante-primario {
+        background: var(--colore-petrolio-sfondo);
+        border-color: var(--colore-petrolio);
+      }
+
+      .pulsante-ambra {
+        background: var(--colore-ambra-sfondo);
+        border-color: var(--colore-ambra-bordo);
+        color: var(--colore-ambra-testo);
+      }
+      .pulsante-ambra:hover:not(:disabled) {
+        background: var(--colore-ambra-bordo);
+      }
+
+      .banner {
+        border-left: 4px solid var(--colore-rosso);
+        background: var(--colore-superficie-alt);
+        color: var(--colore-rosso);
+        padding: 12px 16px;
+        border-radius: 6px;
+        font-family: var(--font-dati);
+        font-size: 0.85rem;
+        margin-bottom: var(--spazio-4);
+      }
+
+      .scheda {
+        background: var(--colore-superficie);
+        border: 1px solid var(--colore-bordo);
+        border-radius: var(--raggio);
+        box-shadow: var(--ombra-scheda);
+        padding: var(--spazio-4);
+        margin-bottom: var(--spazio-4);
+      }
+
+      .scheda-aspettano-te {
+        border-left: 6px solid var(--colore-ambra-bordo);
+        background: var(--colore-ambra-sfondo);
+      }
+      .scheda-aspettano-te h2 {
+        color: var(--colore-ambra-testo);
+      }
+
+      .griglia-secondaria {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: var(--spazio-4);
+        align-items: start;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.1em;
+      }
+      li {
+        margin-bottom: var(--spazio-2);
+      }
+
+      table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+      th {
+        font-family: var(--font-dati);
+        text-transform: uppercase;
+        font-size: 0.68rem;
+        letter-spacing: 0.03em;
+        text-align: left;
+        color: var(--colore-testo-secondario);
+        background: var(--colore-superficie-alt);
+        padding: var(--spazio-2);
+        border-bottom: 2px solid var(--colore-bordo);
+      }
+      td {
+        vertical-align: top;
+        padding: var(--spazio-2);
+        border-bottom: 1px solid var(--colore-bordo);
+        word-break: break-word;
+      }
+
+      label {
+        font-family: var(--font-dati);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--colore-testo-secondario);
+      }
+
+      textarea,
+      input {
+        width: 100%;
+        font-family: var(--font-testo);
+        font-size: 1rem;
+        padding: 8px;
+        border: 1px solid var(--colore-bordo);
+        border-radius: 6px;
+        background: var(--colore-superficie);
+        color: var(--colore-testo);
+        margin-top: var(--spazio-1);
+      }
+
+      p[role="alert"] {
+        color: var(--colore-rosso);
+        font-family: var(--font-dati);
+        font-size: 0.82rem;
+      }
+    </style>
   </head>
   <body>
-    <h1>Registro</h1>
+    <div class="pagina">
+      <header>
+        <h1>Registro</h1>
+      </header>
 
-    <section id="configurazione" hidden>
-      <h2>Configurazione</h2>
-      <form id="formConfigurazione">
-        <div>
-          <label for="repoTesto">Repo (proprietario/nome, uno per riga)</label><br />
-          <textarea id="repoTesto" rows="6" cols="40"></textarea>
+      <section id="configurazione" class="scheda" hidden>
+        <h2>Configurazione</h2>
+        <form id="formConfigurazione">
+          <div>
+            <label for="repoTesto">Repo (proprietario/nome, uno per riga)</label><br />
+            <textarea id="repoTesto" rows="6" cols="40"></textarea>
+          </div>
+          <div>
+            <label for="token">Token</label><br />
+            <input type="password" id="token" autocomplete="off" />
+          </div>
+          <p id="erroreConfigurazione" role="alert"></p>
+          <button type="submit" class="pulsante-primario">Salva</button>
+        </form>
+      </section>
+
+      <section id="dashboard" hidden>
+        <div class="barra-controlli">
+          <div class="controlli">
+            <button id="apriConfigurazione">Configurazione</button>
+            <button id="dimenticaToken">Dimentica il token</button>
+            <button id="aggiornaOra" class="pulsante-primario">Aggiorna</button>
+          </div>
+          <p id="ultimoAggiornamento" class="testo-dati"></p>
         </div>
-        <div>
-          <label for="token">Token</label><br />
-          <input type="password" id="token" autocomplete="off" />
+        <div id="banner" class="banner" role="alert" hidden></div>
+
+        <section id="aspettanoTe" class="scheda scheda-aspettano-te">
+          <h2>Aspettano te</h2>
+          <div id="elencoAspettanoTe"></div>
+        </section>
+
+        <div class="griglia-secondaria">
+          <section id="avanzamento" class="scheda">
+            <h2>Avanzamento</h2>
+            <div id="tabelleAvanzamento"></div>
+          </section>
+
+          <section id="agentiAttivi" class="scheda">
+            <h2>Agenti attivi</h2>
+            <div id="elencoAgentiAttivi"></div>
+          </section>
         </div>
-        <p id="erroreConfigurazione" role="alert"></p>
-        <button type="submit">Salva</button>
-      </form>
-    </section>
-
-    <section id="dashboard" hidden>
-      <h2>Dashboard</h2>
-      <button id="apriConfigurazione">Configurazione</button>
-      <button id="dimenticaToken">Dimentica il token</button>
-      <button id="aggiornaOra">Aggiorna</button>
-      <p id="ultimoAggiornamento"></p>
-      <div id="banner" role="alert" hidden></div>
-
-      <section id="aspettanoTe">
-        <h2>Aspettano te</h2>
-        <div id="elencoAspettanoTe"></div>
       </section>
-
-      <section id="avanzamento">
-        <h2>Avanzamento</h2>
-        <div id="tabelleAvanzamento"></div>
-      </section>
-
-      <section id="agentiAttivi">
-        <h2>Agenti attivi</h2>
-        <div id="elencoAgentiAttivi"></div>
-      </section>
-    </section>
+    </div>
 
     <script type="module">
       import {
@@ -297,6 +580,7 @@
         campo.placeholder = "Scrivi la risposta…";
         const pulsante = document.createElement("button");
         pulsante.type = "button";
+        pulsante.className = "pulsante-ambra";
         pulsante.textContent = "Rispondi e riavvia";
         pulsante.disabled = true;
         const erroreRisposta = document.createElement("p");
