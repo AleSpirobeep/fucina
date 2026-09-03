@@ -1,60 +1,26 @@
-Implementa T12 — lo script di avvio `ui/apri.ps1` (REQ-143).
+Implementa la funzione pura `estraiSezioni(corpo)` in `ui/lib.js` (REQ-110 parte, REQ-141): dato il corpo markdown di una PR, restituisce `{ nonFatto, fattoInPiu, decisioni }` con il testo di ciascuna sezione o `null` se l'intestazione (`## Non fatto`, `## Fatto in più`, `## Decisioni`, in qualsiasi ordine) non compare.
 
-Secondo tentativo: la PR #35 (tentativo 1) è stata chiusa dal PM perché su Windows
-senza Python installato, `Get-Command python`/`python3` trova comunque l'alias di
-esecuzione dello Store (attivo per impostazione predefinita in `%LOCALAPPDATA%\Microsoft\WindowsApps`),
-che eseguito con argomenti stampa un messaggio di errore ed esce con codice 9009: lo
-script tentava comunque di avviare il server, senza mai riuscirci, e il messaggio
-finale ("Il server locale non ha risposto entro 5 secondi") descriveva una causa
-sbagliata.
+Il testo di ogni sezione va da dopo l'intestazione fino alla prossima intestazione di livello 2 (o alla fine del corpo); un'intestazione di livello 3+ dentro una sezione non la interrompe. Prima di riconoscere le sezioni, il corpo viene ripulito della coda che il workflow accoda dopo l'ultima sezione (ADR `2026-09-02-1700-pr-aperta-dal-workflow.md`): righe finali `Closes #N` e `Generated with Claude Code ...`. Un `Closes #N` che compare *prima* delle sezioni riconosciute non viene toccato.
 
-- `ui/apri.ps1`: script PowerShell 5.1 compatibile che:
-  - cerca `py`, poi `python`, poi `python3` sul `PATH`; ogni candidato trovato viene
-    accettato solo se `<candidato> --version` produce un output che inizia con
-    `Python 3` — questo scarta l'alias dello Store, che con `--version` non stampa
-    quella stringa;
-  - se nessun candidato supera la prova, spiega che Python non è installato, dove
-    scaricarlo, e che `python`/`python3` nel PATH possono essere solo l'alias dello
-    Store, senza tentare di avviare nulla;
-  - se non trova un server già attivo (vedi sotto), cerca una porta libera fra 8000 e
-    8099 provando una connessione TCP diretta, avvia `python -m http.server <porta>`
-    con la cartella `ui/` come working directory, in una finestra nascosta, e attende
-    fino a 5 secondi che risponda;
-  - salva la porta usata in `ui/.apri-stato.json`; al riavvio, se quella porta risponde
-    ancora a una connessione TCP, non avvia un secondo server e apre solo il browser;
-  - apre il browser predefinito su `http://localhost:<porta>/index.html`.
-- `.gitignore`: aggiunta `ui/.apri-stato.json` (file di stato runtime, non va in git).
-
-Verificato con `node --test "ui/**/*.test.js"`: 70 test, tutti verdi (lo script non
-introduce funzioni JS, quindi non aggiunge test a quel comando). Ho riletto lo script
-riga per riga contro la sintassi di PowerShell 5.1 (niente operatori o cmdlet
-introdotti dopo; `ConvertTo-Json`/`ConvertFrom-Json` e `$PSScriptRoot` sono
-disponibili da PS 3.0/5.0) e in particolare contro il caso segnalato dal PM: con
-l'alias dello Store, `& $Percorso '--version' 2>&1 | Out-String` cattura il messaggio
-"Python was not found; run without arguments to install from the Microsoft Store" (non
-`^Python 3`), quindi il candidato viene scartato senza lanciare `-m http.server`. Non
-ho potuto eseguirlo su un Windows reale né avviare un browser da questo ambiente:
-`pwsh` non è fra gli strumenti permessi da `.fucina.yml` (`strumenti_permessi` elenca
-solo `Bash(node:*)` e `Bash(git:*)`) e comunque qui non c'è un display per verificare
-l'apertura del browser.
+**Verificato con:** `node --test "ui/**/*.test.js"` — 77/77 verdi. I nuovi test sono in `ui/estraiSezioni.test.js`, su:
+- il corpo reale della PR #6 di `fucina-lab` (salvato in `ui/fixtures/pr-body-6.md`), sezioni in ordine Decisioni/Non fatto/Fatto in più, coda `Closes #5` esclusa;
+- il corpo reale della PR #9 di `fucina-lab` (salvato in `ui/fixtures/pr-body-9.md`), con `Closes #8` a metà corpo (non tocca le sezioni) e la coda finale `Generated with Claude Code ...` + `Closes #8` esclusa dall'ultima sezione;
+- un corpo senza sezioni (tutte e tre le chiavi `null`);
+- una sezione con solo "Nulla" restituita come testo, non `null`;
+- intestazioni in ordine sparso;
+- un'intestazione di livello 3 dentro una sezione che non la interrompe;
+- coda finale (`Closes #N` + riga "Generated with Claude Code") esclusa dall'ultima sezione, caso isolato.
 
 ## Decisioni
 
-- [`docs/decisions/2026-09-03-1155-rilevamento-server-attivo-in-apri-ps1.md`](../docs/decisions/2026-09-03-1155-rilevamento-server-attivo-in-apri-ps1.md):
-  come lo script riconosce che un server è già attivo (file di stato con la porta,
-  verificata con una connessione TCP diretta, non un PID).
+Nessun ADR nuovo: le regole sulla coda del workflow e sull'ordine delle sezioni erano già decise nei commenti della issue e nell'ADR `2026-09-02-1700-pr-aperta-dal-workflow.md`; l'unica scelta implementativa (livello 3+ non interrompe una sezione) era già stata validata nel tentativo precedente su questa stessa issue.
 
 ## Non fatto
 
-Il collaudo dal vivo dei quattro criteri di accettazione (`.\ui\apri.ps1` apre il
-browser sulla dashboard; un secondo avvio non apre un secondo server; funziona da
-PowerShell 5.1; con solo l'alias dello Store nel PATH lo script si ferma spiegando
-cosa manca senza tentare di avviare il server) richiede una macchina Windows: non
-verificabile da questo ambiente Linux. Ho verificato invece che i test JS esistenti
-restano verdi e ho riletto lo script contro la sintassi PowerShell 5.1 e contro il
-comportamento dell'alias dello Store descritto dal PM.
+Nulla: tutti i criteri di accettazione della issue, inclusi quelli aggiunti nei commenti del PM (fixture reali, esclusione della coda `Closes #N`/`Generated with Claude Code`), sono coperti.
 
 ## Fatto in più
 
-`.gitignore`: aggiunta una riga per ignorare `ui/.apri-stato.json`, il file di stato
-che lo script scrive alla prima esecuzione.
+Nulla: solo `ui/lib.js`, il nuovo file di test `ui/estraiSezioni.test.js` e le due nuove fixture `ui/fixtures/pr-body-6.md` e `ui/fixtures/pr-body-9.md` sono stati toccati.
+
+Closes #15

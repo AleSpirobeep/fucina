@@ -2,6 +2,49 @@ export function versione() {
   return "0.1.0";
 }
 
+const INTESTAZIONI_SEZIONI = {
+  "Non fatto": "nonFatto",
+  "Fatto in più": "fattoInPiu",
+  "Decisioni": "decisioni",
+};
+
+// Il workflow accoda `Closes #N` (ed eventualmente una riga "Generated with
+// Claude Code ...") dopo l'ultima sezione del corpo (ADR 2026-09-02-1700):
+// non fa parte del testo della sezione che precede.
+const CODA_WORKFLOW_RE = /^(Closes #\d+|Generated with Claude Code\b.*)$/;
+
+function rimuoviCodaWorkflow(testo) {
+  const righe = testo.split("\n");
+  while (righe.length > 0) {
+    const ultima = righe[righe.length - 1].trim();
+    if (ultima === "" || CODA_WORKFLOW_RE.test(ultima)) {
+      righe.pop();
+      continue;
+    }
+    break;
+  }
+  return righe.join("\n");
+}
+
+export function estraiSezioni(corpo) {
+  const testo = rimuoviCodaWorkflow(corpo || "");
+  const risultato = { nonFatto: null, fattoInPiu: null, decisioni: null };
+
+  const corrispondenze = [...testo.matchAll(/^## (.+)$/gm)];
+
+  for (let i = 0; i < corrispondenze.length; i++) {
+    const corrispondenza = corrispondenze[i];
+    const chiave = INTESTAZIONI_SEZIONI[corrispondenza[1].trim()];
+    if (!chiave) continue;
+
+    const inizio = corrispondenza.index + corrispondenza[0].length;
+    const fine = i + 1 < corrispondenze.length ? corrispondenze[i + 1].index : testo.length;
+    risultato[chiave] = testo.slice(inizio, fine).trim();
+  }
+
+  return risultato;
+}
+
 export function parseElencoRepo(testo) {
   return (testo || "")
     .split("\n")
