@@ -49,6 +49,11 @@ function statoPiuAvanzato(nomi) {
   return "backlog";
 }
 
+export function dataIsoGiorniFa(giorni, oggi = new Date()) {
+  const oggiMs = new Date(oggi).getTime();
+  return new Date(oggiMs - giorni * MS_AL_GIORNO).toISOString();
+}
+
 export function classifica(issues, prs, oggi) {
   const risultato = {
     backlog: [],
@@ -84,4 +89,69 @@ export function classifica(issues, prs, oggi) {
   }
 
   return risultato;
+}
+
+// --- Client per l'API di GitHub: parte pura (URL, interpretazione di stati ed errori). ---
+// Le chiamate fetch vere e proprie sono in github.js, che usa queste funzioni.
+
+const API_GITHUB = "https://api.github.com";
+
+export function urlIssueRepo(repo, { stato = "open", since } = {}) {
+  const parametri = new URLSearchParams({ state: stato, per_page: "100" });
+  if (since) parametri.set("since", since);
+  return `${API_GITHUB}/repos/${repo}/issues?${parametri}`;
+}
+
+export function urlPrRepo(repo, { stato = "open" } = {}) {
+  const parametri = new URLSearchParams({ state: stato, per_page: "100" });
+  return `${API_GITHUB}/repos/${repo}/pulls?${parametri}`;
+}
+
+export function urlCommentiIssue(repo, numero) {
+  return `${API_GITHUB}/repos/${repo}/issues/${numero}/comments`;
+}
+
+export function urlStatoCheckPr(repo, ref) {
+  return `${API_GITHUB}/repos/${repo}/commits/${ref}/status`;
+}
+
+export function urlRunWorkflow(repo, workflowFile = "dev-agent.yml") {
+  const parametri = new URLSearchParams({ per_page: "20" });
+  return `${API_GITHUB}/repos/${repo}/actions/workflows/${workflowFile}/runs?${parametri}`;
+}
+
+export function interpretaStatoCheck(statoCombinato) {
+  switch (statoCombinato) {
+    case "success":
+      return "verde";
+    case "failure":
+    case "error":
+      return "rosso";
+    default:
+      return "in attesa";
+  }
+}
+
+export function interpretaErroreHttp(status, repo) {
+  if (status === 401) {
+    return { codice: 401, messaggio: "Token non valido o scaduto." };
+  }
+  if (status === 404) {
+    return {
+      codice: 404,
+      messaggio: `Il repo ${repo} non esiste o non è raggiungibile.`,
+    };
+  }
+  return {
+    codice: status,
+    messaggio: `Richiesta a GitHub fallita (codice ${status}).`,
+  };
+}
+
+export class ErroreGitHub extends Error {
+  constructor(codice, messaggio) {
+    super(messaggio);
+    this.name = "ErroreGitHub";
+    this.codice = codice;
+  }
 }
