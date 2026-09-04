@@ -1,0 +1,13 @@
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 987654321,
+      "name": "pm-agent",
+      "status": "completed",
+      "conclusion": "success",
+      "run_started_at": "2026-09-04T18:30:00Z",
+      "html_url": "https://github.com/AleSpirobeep/fucina/actions/runs/987654321"
+    }
+  ]
+}

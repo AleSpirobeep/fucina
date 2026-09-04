@@ -145,6 +145,22 @@ export function riduciStatoPm(state) {
   return state === "active" ? "acceso" : "spento";
 }
 
+// contracts/comandi-pm.md — L2: ultima esecuzione di pm-agent.yml, una sola (per_page=1).
+export function urlUltimaEsecuzionePm(repo) {
+  return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml/runs?per_page=1`;
+}
+
+// contracts/comandi-pm.md — L2: un run concluso espone la propria conclusione,
+// uno ancora in corso il proprio stato; l'assenza di run (`run` nullo) dà «nessuna».
+export function riduciUltimaEsecuzionePm(run) {
+  if (!run) return { esito: "nessuna", data: null, url: null };
+  return {
+    esito: run.status === "completed" ? run.conclusion : run.status,
+    data: run.run_started_at,
+    url: run.html_url,
+  };
+}
+
 export function urlLabelIssue(repo, numero) {
   return `${API_BASE}/repos/${repo}/issues/${numero}/labels`;
 }
@@ -213,6 +229,14 @@ export function interpretaStatoCheckRuns(checkRuns) {
   }
 
   return inAttesa ? "in attesa" : "verde";
+}
+
+// contracts/comandi-pm.md — inCoda: issue aperte con `in-coda`, contate dai dati
+// che il Registro scarica già per la tabella di REQ-120 (nessuna chiamata nuova).
+export function contaInCoda(issues) {
+  return (issues || []).filter(
+    (issue) => !issue.pull_request && issue.state === "open" && nomiLabel(issue).includes("in-coda"),
+  ).length;
 }
 
 export function classifica(issues, prs, oggi) {

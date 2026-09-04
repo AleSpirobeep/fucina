@@ -10,6 +10,8 @@ import {
   urlRunWorkflow,
   urlStatoPm,
   riduciStatoPm,
+  urlUltimaEsecuzionePm,
+  riduciUltimaEsecuzionePm,
   urlLabelIssue,
   urlRimuoviLabelIssue,
   FASE_COMMENTO,
@@ -78,6 +80,12 @@ export async function statoPm(token, repo) {
     }
     throw errore;
   }
+}
+
+// contracts/comandi-pm.md — L2: ultima esecuzione di pm-agent.yml.
+export async function ultimaEsecuzionePm(token, repo) {
+  const dati = await richiesta(urlUltimaEsecuzionePm(repo), token, repo);
+  return riduciUltimaEsecuzionePm(dati.workflow_runs[0]);
 }
 
 export function pubblicaCommento(token, repo, numero, testo) {
