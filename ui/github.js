@@ -12,6 +12,9 @@ import {
   riduciStatoPm,
   urlUltimaEsecuzionePm,
   riduciUltimaEsecuzionePm,
+  urlFermaPm,
+  urlEsecuzioniInCorsoPm,
+  riduciEsecuzioniInCorsoPm,
   urlLabelIssue,
   urlRimuoviLabelIssue,
   FASE_COMMENTO,
@@ -87,6 +90,20 @@ export async function statoPm(token, repo) {
 export async function ultimaEsecuzionePm(token, repo) {
   const dati = await richiesta(urlUltimaEsecuzionePm(repo), token, repo);
   return riduciUltimaEsecuzionePm(dati.workflow_runs);
+}
+
+// contracts/comandi-pm.md — L3.
+export async function esecuzioniInCorsoPm(token, repo) {
+  const dati = await richiesta(urlEsecuzioniInCorsoPm(repo), token, repo);
+  return riduciEsecuzioniInCorsoPm(dati.workflow_runs);
+}
+
+// contracts/comandi-pm.md — S1 poi L3: «Ferma» disabilita pm-agent.yml e poi
+// elenca ciò che finirà il proprio ciclo (REQ-411, 412). L'ordine è fisso: la
+// scrittura per prima, la lettura che ne racconta l'effetto subito dopo.
+export async function fermaPm(token, repo) {
+  await richiesta(urlFermaPm(repo), token, repo, { metodo: "PUT" });
+  return esecuzioniInCorsoPm(token, repo);
 }
 
 export function pubblicaCommento(token, repo, numero, testo) {

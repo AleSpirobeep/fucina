@@ -149,6 +149,20 @@ export function urlUltimaEsecuzionePm(repo) {
   return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml/runs?per_page=1`;
 }
 
+// contracts/comandi-pm.md — S1: l'unica scrittura del comando «Ferma».
+export function urlFermaPm(repo) {
+  return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml/disable`;
+}
+
+// contracts/comandi-pm.md — L3: le esecuzioni ancora in corso dopo un «Ferma» riuscito.
+export function urlEsecuzioniInCorsoPm(repo) {
+  return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml/runs?status=in_progress`;
+}
+
+export function riduciEsecuzioniInCorsoPm(runs) {
+  return (runs || []).map((run) => ({ titolo: run.display_title, url: run.html_url }));
+}
+
 // contracts/comandi-pm.md — L2: un run concluso espone la propria `conclusion`,
 // uno ancora in corso espone il proprio `status`. Nessun run non è un errore:
 // dà "nessuna" (a differenza del 404 di L1, qui un 404 resta un errore vero).
@@ -206,6 +220,12 @@ export function testoUltimaEsecuzionePm(ultimaEsecuzione, adesso) {
 // REQ-403: il testo che dice che lo stato del PM non è aggiornato, senza far sparire la riga.
 export function messaggioStatoPmNonAggiornato(errore) {
   return `Stato del PM non aggiornato: ${errore}`;
+}
+
+// REQ-412: dopo «Ferma», la pagina dice cosa finirà il proprio ciclo, o che non c'è niente.
+export function testoEsecuzioniInCorsoPm(esecuzioni) {
+  const lista = esecuzioni || [];
+  return lista.length === 0 ? "Nessuna esecuzione del PM in corso." : "Finiranno il proprio ciclo:";
 }
 
 // REQ-402, 404: con "non-installato" niente pulsante e niente ultima esecuzione (L2 non si
