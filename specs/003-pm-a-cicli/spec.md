@@ -349,9 +349,17 @@ in meno di dieci minuti.
 
 - **REQ-270** — Il modello non ha, in nessuna configurazione, strumenti per fondere, chiudere,
   etichettare, commentare, fare commit o push. Tutti gli effetti passano dal workflow (P9).
+  *Verifica:* il passo di configurazione di `pm-agent.yml` esce con errore se
+  `pm.strumenti_permessi` contiene `gh pr merge`, `gh pr close`, `gh issue edit`,
+  `git push` o `Bash` senza restrizione; nel log del passo «Esegui il PM» l'elenco
+  `--allowedTools` contiene solo strumenti di lettura più `Write`.
 - **REQ-271** — Nessun `--admin`, nessun bypass delle protezioni, nessun token in chiaro.
+  *Verifica:* la stringa `--admin` non compare in `pm-agent.yml` né in `pm.ps1`; il log di
+  un'esecuzione, cercato per `token` e `ghp_`/`github_pat_`, mostra solo `***`.
 - **REQ-272** — Il PM non tocca `ui/`, `template/`, `plugin/`, `init.sh`, `.fucina.yml`,
   `specs/`, `.specify/`. Questi restano umani (spec) o dell'agente sviluppatore (codice).
+  *Verifica:* ogni commit su `main` firmato `pm-agent` tocca solo `docs/decisions/`
+  (`git log --author=pm-agent --stat`).
 
 ### Entità
 

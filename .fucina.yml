@@ -37,6 +37,12 @@ analista:
     - "Bash(gh pr view:*)"
     - "Bash(gh pr create:*)"
 
+# Il PM a cicli (spec 003): Opus 5 alla revisione, l'unico punto senza check a valle.
+pm:
+  modello: "claude-opus-5"
+  max_turns: 40
+  max_budget_usd: 5.00
+
 strumenti_permessi:
   - "Edit"
   - "Write"

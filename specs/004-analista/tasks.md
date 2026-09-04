@@ -8,6 +8,12 @@ ruolo è prosa e si verifica leggendolo e con i controlli elencati task per task
 **Organizzazione**: un task = una issue = una PR, lavorata dall'agente sviluppatore e
 revisionata dal PM. Ordine sequenziale.
 
+**Stato** (3/9/2026): T001–T004 realizzati direttamente sul branch
+`claude/github-spec-agent-u44d3h` da una sessione Claude Code, **non** dal loop dev-agent →
+PM (il loop era fermo per l'installazione della spec 003), e revisionati prima della fusione
+su `main`: 188 test verdi, cancello verde su questa spec. È un'eccezione dichiarata, non il
+modo normale. Resta T005, a cura di Alessio.
+
 ## Formato: `[ID] [Scenario] Descrizione`
 
 - **[US1..US5]**: scenario d'uso della spec (1 idea → coda, 2 si ferma sui buchi,
@@ -15,7 +21,7 @@ revisionata dal PM. Ordine sequenziale.
 
 ## Fase 1: il cancello
 
-- [ ] T001 [US3] Il cancello `template/scripts/analista-cancello.js`, con i suoi test e le
+- [x] T001 [US3] Il cancello `template/scripts/analista-cancello.js`, con i suoi test e le
       fixture accanto, in `template/scripts/`. Funzione pura `verifica({documenti,
       configurazione, fileEsistenti})` più `estraiRequisiti`, `estraiTask`,
       `requisitiCitati`, `percorsiCitati`, `puntiAperti`, `haSezione`,
@@ -27,7 +33,7 @@ revisionata dal PM. Ordine sequenziale.
 
 ## Fase 2: il ruolo
 
-- [ ] T002 [US1][US2][US5] Il ruolo `plugin/skills/analista/SKILL.md`, prima parte: i
+- [x] T002 [US1][US2][US5] Il ruolo `plugin/skills/analista/SKILL.md`, prima parte: i
       controlli preliminari sul repo, l'ordine di lettura, i giri di domande chiuse con
       opzioni e conseguenze e il loro tetto, la trascrizione delle coppie D/R in
       «Chiarimenti», le due mosse quando Alessio non sa (rinviare o restringere), il confine
@@ -39,7 +45,7 @@ revisionata dal PM. Ordine sequenziale.
       template di spec, piano o task proprio; dice esplicitamente che non si scrive alcun
       file prima del primo giro di domande.
 
-- [ ] T003 [US1][US3] Il ruolo, seconda parte: l'esecuzione del cancello e il divieto di
+- [x] T003 [US1][US3] Il ruolo, seconda parte: l'esecuzione del cancello e il divieto di
       aggirarlo, il riepilogo e l'attesa della conferma, la consegna con le issue `in-coda`
       dai task, il rifiuto se la spec non è su `main`, l'idempotenza, il messaggio finale
       con il comando che resta ad Alessio, la ripresa di un'analisi lasciata a metà, e la
@@ -50,7 +56,7 @@ revisionata dal PM. Ordine sequenziale.
 
 ## Fase 3: installazione e configurazione
 
-- [ ] T004 [US1] Installazione: `init.sh` copia il cancello e il ruolo nel repo di
+- [x] T004 [US1] Installazione: `init.sh` copia il cancello e il ruolo nel repo di
       destinazione con la funzione `copia` esistente e aggiunge ai passi manuali che
       l'analista non ha nulla da accendere; `template/.fucina.yml` riceve la chiave
       `analista` con modello, tetti, numero massimo di domande per giro e strumenti

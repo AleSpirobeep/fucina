@@ -6,6 +6,11 @@
 **Test**: richiesti dalla spec (P2): la logica di decisione ha test su fixture; i workflow
 si verificano con `yq` e con il collaudo in `quickstart.md`.
 
+**Stato** (3/9/2026): T001–T007 fusi dal loop (PR #51–#65). Questa spec è nata prima del
+cancello dell'analista (spec 004): passata al cancello a posteriori segnala, oltre ai
+difetti corretti, un falso positivo atteso su T001 (`pm-coda.test.js` oggi esiste, ma il
+task lo creava). Resta T008.
+
 **Organizzazione**: un task = una issue = una PR, lavorata dall'agente sviluppatore e
 revisionata dal PM. Ordine sequenziale (il loop lavora una issue per volta); `[P]` indica
 che il task non dipende dal precedente e potrebbe andare in parallelo.
@@ -32,7 +37,9 @@ che il task non dipende dal precedente e potrebbe andare in parallelo.
       `template/scripts/fixtures/` (comprese le copie di `ui/fixtures/pr-body-6.md` e
       `pr-body-9.md`). Esporta `decidi`, `estraiSezioniMancanti`, `identificativoTask`;
       CLI su stdin/stdout. Nessuna dipendenza. Copre REQ-210, 211, 212, 213 (decisione),
-      214 (decisione), 215 (decisione), 216.
+      214 (decisione), 215 (decisione), 216. Verifica: `node --test
+      "template/scripts/**/*.test.js"` verde; ogni fixture della tabella del contratto
+      produce la decisione attesa; la CLI esce 2 su input non valido e 0 altrimenti.
 
 ## Fase 2: il workflow
 

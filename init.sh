@@ -95,6 +95,8 @@ if [ ${#SALTATI[@]} -gt 0 ]; then
   giallo "File non toccati perché già presenti:"
   printf '  %s\n' "${SALTATI[@]}"
   giallo "Se vuoi rigenerarli, cancellali e rilancia init."
+  giallo "Se uno di questi e' una copia piu' vecchia del modello (un ruolo in .claude/skills/,"
+  giallo "un workflow in .github/workflows/), aggiornalo a mano copiando il file dal template."
   echo
 fi
 
@@ -129,10 +131,15 @@ $(giallo "Restano sei cose che init non può fare al posto tuo:")
      Claude Code aperta su questo repo. Porta un'idea fino alle issue "in-coda" e
      si ferma lì — le issue le crea con /analista consegna, e il PM lo accendi tu.
 
-  6. Il PM (workflow pm-agent.yml) è installato spento. Il login gh locale deve
-     avere lo scope "workflow" per poterlo accendere: se manca, esegui
+  6. Il PM (workflow pm-agent.yml) nasce ATTIVO nel momento in cui il push lo
+     pubblica: GitHub non permette di installare un workflow spento. Subito dopo
+     il push, se non vuoi che reagisca agli eventi, esegui scripts/pm.ps1 ferma.
+     Il login gh locale deve avere lo scope "workflow" per accenderlo e spegnerlo:
+     se manca, esegui
        gh auth refresh -s workflow
      Per accenderlo: scripts/pm.ps1 avvia (spegnerlo: scripts/pm.ps1 ferma).
+     Prima del primo avvio, l'issue di rapporto deve avere la label rapporto-pm e
+     nessuna needs-human: altrimenti il PM la scambia per una domanda.
      Le issue dei task vanno create con la label "in-coda" e un titolo
      "T001: ..." — è così che il PM le trova e le ordina.
 
