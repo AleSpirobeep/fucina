@@ -1,54 +1,26 @@
 ## Cosa ho fatto
 
-Aggiunta la funzione `Da-Json($testo)` in `template/scripts/pm.ps1`:
+Implementata la lettura dello stato del PM (`L1` del contratto `specs/005-interruttore-nel-registro/contracts/comandi-pm.md`):
 
-```powershell
-function Da-Json($testo) {
-    return @((($testo -join "") | ConvertFrom-Json) | ForEach-Object { $_ })
-}
-```
-
-e sostituiti tutti e cinque i punti che chiamavano `ConvertFrom-Json` direttamente
-(`Conta-Pr`, `Conta-Issue`, `Conta-DomandeInAttesa`, `Invoca-Ferma`, `Invoca-Stato`) con
-chiamate a `Da-Json`. Nessun'altra riga toccata: BOM (`EF BB BF`) preservato, nessun
-`&&`, nessun operatore ternario, nessuna occorrenza di `token`.
-
-Su PowerShell 5.1 `ConvertFrom-Json` deposita un array JSON sulla pipeline come un solo
-oggetto, non srotolato elemento per elemento: `@(...).Count` vale quindi sempre 1, sia
-con zero elementi che con dieci. Su PowerShell 7 la pipeline srotola invece
-correttamente ogni elemento dell'array prima che `@()` lo raccolga, per questo il
-difetto non si vede sul runner GitHub (che gira su PS7). `ForEach-Object { $_ }` dentro
-`Da-Json` forza lo srotolamento anche su 5.1, allineando i due comportamenti.
-
-Chiude #67.
+- `ui/lib.js`: `urlStatoPm(repo)` costruisce l'URL `GET /repos/REPO/actions/workflows/pm-agent.yml`; `riduciStatoPm(state)` è la funzione pura che riduce il campo `state` ai tre soli valori `acceso`, `spento`, `non-installato` (`null` rappresenta il 404).
+- `ui/github.js`: `statoPm(token, repo)` esegue la lettura riusando l'helper `richiesta` già presente, cattura un `ErroreGitHub` con `codice === 404` e lo traduce in `non-installato` invece di rilanciarlo; ogni altro errore risale invariato.
+- Fixture `ui/fixtures/workflow-pm-attivo.json` (`state: "active"`) e `ui/fixtures/workflow-pm-disabilitato.json` (`state: "disabled_manually"`), forma della risposta reale dell'endpoint "Get a workflow".
+- Test in `ui/stato-pm.test.js`: costruzione URL, riduzione pura per `active`/`disabled_manually`/`disabled_inactivity`/`null`, e `statoPm` per i quattro casi di `github.js` (200 acceso, 200 spento, 404 → non-installato senza eccezione, altro codice → `ErroreGitHub`).
 
 ## Come l'ho verificato
 
-`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` → 188/188 verdi
-(`pm.ps1` è PowerShell, non coperto da questa suite; né T005 né i criteri della issue
-chiedono test automatici per questo file).
-
-Controlli manuali sul file: primi tre byte `ef bb bf` (BOM intatto); nessuna occorrenza
-di `ConvertFrom-Json` fuori da `Da-Json`; cinque chiamate a `Da-Json` nei punti attesi;
-nessuna occorrenza di `&&`, operatori ternari o della stringa `token`.
-
-**Verifica manuale ancora da fare, a cura di Alessio dopo la fusione** (richiede
-PowerShell 5.1 reale): `stato` su repo vuoto deve stampare 0 in tutti i conteggi e
-"Ultima esecuzione: nessuna."; `ferma` senza esecuzioni deve stampare "Nessuna
-esecuzione in corso."
+`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 197 test, tutti verdi.
 
 ## Decisioni
 
-Nessun ADR: la correzione è vincolata dall'issue allo snippet esatto indicato, non c'è
-scelta di implementazione lasciata a questo agente.
+Nulla: nessuna decisione fuori dal contratto, quindi nessun ADR.
 
 ## Non fatto
 
-La verifica manuale di `stato`/`ferma` su un repo vuoto in PowerShell 5.1 reale: l'issue
-la affida esplicitamente ad Alessio dopo la fusione (non è automatizzabile in questo
-ambiente, che non ha PowerShell 5.1).
+Nulla rispetto ai criteri di accettazione della issue: tutti e quattro sono coperti dai test elencati sopra. Il resto della spec 005 (L2-L4, S1-S3, l'interruttore in `index.html`, `lavoroInAttesa`) è fuori perimetro di questo task, come da issue.
 
 ## Fatto in più
 
-Nessuno: modifica minima, solo `template/scripts/pm.ps1` e questo file, come richiesto
-dall'issue.
+Nulla: solo i cinque file elencati nella issue sono stati toccati.
+
+Closes #72

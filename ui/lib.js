@@ -134,6 +134,17 @@ export function urlRunWorkflow(repo) {
   return `${API_BASE}/repos/${repo}/actions/workflows/dev-agent.yml/runs?per_page=50`;
 }
 
+export function urlStatoPm(repo) {
+  return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml`;
+}
+
+// contracts/comandi-pm.md — L1: uno dei soli tre valori mostrati dal Registro.
+// `state` è null quando L1 risponde 404 (il workflow non è installato), non un errore.
+export function riduciStatoPm(state) {
+  if (state == null) return "non-installato";
+  return state === "active" ? "acceso" : "spento";
+}
+
 export function urlLabelIssue(repo, numero) {
   return `${API_BASE}/repos/${repo}/issues/${numero}/labels`;
 }

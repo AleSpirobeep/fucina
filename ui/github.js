@@ -8,6 +8,8 @@ import {
   urlCommentiIssue,
   urlCheckRuns,
   urlRunWorkflow,
+  urlStatoPm,
+  riduciStatoPm,
   urlLabelIssue,
   urlRimuoviLabelIssue,
   FASE_COMMENTO,
@@ -62,6 +64,20 @@ export async function statoCheckPr(token, repo, ref) {
 export async function runWorkflow(token, repo) {
   const dati = await richiesta(urlRunWorkflow(repo), token, repo);
   return dati.workflow_runs;
+}
+
+// contracts/comandi-pm.md — L1: un 404 è lo stato "non-installato", non un errore;
+// ogni altro codice diverso da 200 resta un ErroreGitHub come le altre letture.
+export async function statoPm(token, repo) {
+  try {
+    const dati = await richiesta(urlStatoPm(repo), token, repo);
+    return riduciStatoPm(dati.state);
+  } catch (errore) {
+    if (errore instanceof ErroreGitHub && errore.codice === 404) {
+      return riduciStatoPm(null);
+    }
+    throw errore;
+  }
 }
 
 export function pubblicaCommento(token, repo, numero, testo) {

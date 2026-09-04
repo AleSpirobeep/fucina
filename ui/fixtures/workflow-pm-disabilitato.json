@@ -1,0 +1,12 @@
+{
+  "id": 161335,
+  "node_id": "MDg6V29ya2Zsb3cxNjEzMzU=",
+  "name": "pm-agent",
+  "path": ".github/workflows/pm-agent.yml",
+  "state": "disabled_manually",
+  "created_at": "2026-08-01T09:00:00.000Z",
+  "updated_at": "2026-09-04T19:00:00.000Z",
+  "url": "https://api.github.com/repos/AleSpirobeep/fucina/actions/workflows/161335",
+  "html_url": "https://github.com/AleSpirobeep/fucina/blob/main/.github/workflows/pm-agent.yml",
+  "badge_url": "https://github.com/AleSpirobeep/fucina/workflows/pm-agent/badge.svg"
+}
