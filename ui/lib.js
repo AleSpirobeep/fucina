@@ -159,6 +159,22 @@ export function urlEsecuzioniInCorsoPm(repo) {
   return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml/runs?status=in_progress`;
 }
 
+// contracts/comandi-pm.md — L4: il ramo di default, letto solo al click su «Avvia»
+// (docs/decisions/2026-09-04-1900-ramo-del-giro-di-recupero.md), mai a ogni aggiornamento.
+export function urlRepoInfo(repo) {
+  return `${API_BASE}/repos/${repo}`;
+}
+
+// contracts/comandi-pm.md — S2: l'abilitazione del comando «Avvia».
+export function urlAbilitaPm(repo) {
+  return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml/enable`;
+}
+
+// contracts/comandi-pm.md — S3: il giro di recupero, sul ramo letto da L4.
+export function urlGiroDiRecuperoPm(repo) {
+  return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml/dispatches`;
+}
+
 export function riduciEsecuzioniInCorsoPm(runs) {
   return (runs || []).map((run) => ({ titolo: run.display_title, url: run.html_url }));
 }
@@ -266,10 +282,18 @@ export const FASE_COMMENTO = "commento";
 export const FASE_RIMUOVI_NEEDS_HUMAN = "rimuoviNeedsHuman";
 export const FASE_AGGIUNGI_READY_FOR_DEV = "aggiungiReadyForDev";
 
+// contracts/comandi-pm.md — le fasi del comando «Avvia»: L4, poi S2, poi S3 (REQ-414, 415).
+export const FASE_RAMO_DEFAULT = "ramoDefault";
+export const FASE_ABILITAZIONE = "abilitazione";
+export const FASE_GIRO_DI_RECUPERO = "giroDiRecupero";
+
 const DESCRIZIONE_FASE = {
   [FASE_COMMENTO]: "nel pubblicare il commento",
   [FASE_RIMUOVI_NEEDS_HUMAN]: "nel togliere l'etichetta needs-human",
   [FASE_AGGIUNGI_READY_FOR_DEV]: "nell'aggiungere l'etichetta ready-for-dev",
+  [FASE_RAMO_DEFAULT]: "nel leggere il ramo di default",
+  [FASE_ABILITAZIONE]: "nell'abilitazione del PM",
+  [FASE_GIRO_DI_RECUPERO]: "nell'avviare il giro di recupero",
 };
 
 export function messaggioErroreFase(fase, messaggioOriginale) {
@@ -282,6 +306,19 @@ export function testoRispostaValido(testo) {
 
 export function messaggioConfermaRisposta(issue, testo) {
   return `Pubblicare questo commento su "${issue.title}" (#${issue.number}) e riavviare l'agente?\n\n${testo}`;
+}
+
+// contracts/comandi-pm.md, REQ-413: stessa forma nativa di messaggioConfermaRisposta
+// (ADR 2026-09-03-1425). Nomina il repo e avverte che il giro di recupero chiama il modello.
+export function messaggioConfermaAvvia(repo) {
+  return `Avviare il PM su "${repo}"? Subito dopo parte un giro di recupero, che chiama il modello.`;
+}
+
+// contracts/comandi-pm.md — i tre esiti di «Avvia» (REQ-414, 415). Un fallimento di L4 o
+// S2 conta come `abilitazioneRiuscita: false`: S3 non viene nemmeno tentata.
+export function esitoAvvia(abilitazioneRiuscita, giroDiRecuperoRiuscito) {
+  if (!abilitazioneRiuscita) return "non-abilitato";
+  return giroDiRecuperoRiuscito ? "riuscito" : "solo-abilitato";
 }
 
 // Le run duplicano gli eventi (push, pull_request) sullo stesso commit: si aggregano tutte.
