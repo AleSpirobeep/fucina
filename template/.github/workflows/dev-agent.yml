@@ -158,19 +158,31 @@ jobs:
           # Il corpo lo scrive l'agente in .fucina/pr-body.md sul branch.
           # L'action vieta all'agente di aprire PR da sé (è nel suo prompt di
           # sistema), quindi la apriamo qui con il testo che ha preparato.
-          if git show "origin/$BRANCH:.fucina/pr-body.md" > /tmp/pr-body.md 2>/dev/null \
-             && [ -s /tmp/pr-body.md ]; then
+          #
+          # Il file è versionato: sul branch esiste SEMPRE, ereditato da $BASE.
+          # Vale quindi solo se questo branch l'ha davvero cambiato — altrimenti è
+          # il corpo del task precedente, e descriverebbe un altro lavoro.
+          git show "origin/$BRANCH:.fucina/pr-body.md" > /tmp/pr-body.md 2>/dev/null \
+            || : > /tmp/pr-body.md
+          git show "origin/$BASE:.fucina/pr-body.md" > /tmp/pr-body-base.md 2>/dev/null \
+            || : > /tmp/pr-body-base.md
+          if [ -s /tmp/pr-body.md ] && ! cmp -s /tmp/pr-body.md /tmp/pr-body-base.md; then
+            # Le parole chiave di chiusura le mette il workflow, non l'agente (P9).
+            # Un `Closes #` rimasto nel testo collega una seconda issue, e chi legge
+            # il collegamento prende la prima: con un corpo stantio si rimette in
+            # lavorazione la issue sbagliata.
+            sed -i -E 's/\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+//Ig' /tmp/pr-body.md
             printf '\n\nCloses #%s\n' "$ISSUE" >> /tmp/pr-body.md
             echo "Corpo della PR letto dal branch."
           else
             cat > /tmp/pr-body.md <<FINE
-          **Corpo mancante.** L'agente non ha scritto \`.fucina/pr-body.md\`, quindi
-          questa PR non ha le sezioni "Non fatto" e "Fatto in più". Leggi il diff per
-          intero prima di approvare, e considera il ruolo da correggere.
+          **Corpo mancante.** L'agente non ha riscritto \`.fucina/pr-body.md\` per questo
+          task, quindi questa PR non ha le sezioni "Non fatto" e "Fatto in più". Leggi il
+          diff per intero prima di approvare, e considera il ruolo da correggere.
 
           Closes #${ISSUE}
           FINE
-            echo "::warning::.fucina/pr-body.md assente sul branch: PR aperta con corpo minimo."
+            echo "::warning::.fucina/pr-body.md non riscritto da questo branch: PR aperta con corpo minimo."
           fi
 
           gh pr create --base "$BASE" --head "$BRANCH" --title "$TITOLO" --body-file /tmp/pr-body.md
