@@ -165,6 +165,61 @@ export function riduciUltimaEsecuzionePm(runs) {
   };
 }
 
+// REQ-401, 410: la riga del PM mostra un solo pulsante, mai due, e nessuno per non-installato.
+export function testoStatoPm(stato) {
+  if (stato === "acceso") return "PM: acceso";
+  if (stato === "spento") return "PM: spento";
+  return "PM non installato";
+}
+
+export function pulsantePm(stato) {
+  if (stato === "acceso") return "Ferma";
+  if (stato === "spento") return "Avvia";
+  return null;
+}
+
+export function testoInCodaPm(numero) {
+  return `In coda: ${numero}`;
+}
+
+const ESITI_ULTIMA_ESECUZIONE_PM = {
+  success: "riuscita",
+  failure: "fallita",
+  cancelled: "annullata",
+  timed_out: "scaduta",
+  action_required: "richiede azione",
+  startup_failure: "non partita",
+  in_progress: "in corso",
+  queued: "in coda",
+};
+
+// REQ-402: esito e tempo trascorso dall'ultima esecuzione, con il link per chi vuole i dettagli.
+export function testoUltimaEsecuzionePm(ultimaEsecuzione, adesso) {
+  if (!ultimaEsecuzione || ultimaEsecuzione.esito === "nessuna") {
+    return { testo: "Ultima esecuzione: nessuna", url: null };
+  }
+  const esito = ESITI_ULTIMA_ESECUZIONE_PM[ultimaEsecuzione.esito] || ultimaEsecuzione.esito;
+  const trascorso = formattaTempoTrascorso(ultimaEsecuzione.data, adesso);
+  return { testo: `Ultima esecuzione: ${esito}, ${trascorso} fa`, url: ultimaEsecuzione.url };
+}
+
+// REQ-403: il testo che dice che lo stato del PM non è aggiornato, senza far sparire la riga.
+export function messaggioStatoPmNonAggiornato(errore) {
+  return `Stato del PM non aggiornato: ${errore}`;
+}
+
+// REQ-402, 404: con "non-installato" niente pulsante e niente ultima esecuzione (L2 non si
+// chiama nemmeno), ma il conteggio in-coda resta: non dipende dall'installazione del PM.
+export function rigaPm(stato, inCoda, ultimaEsecuzione, adesso) {
+  const installato = stato !== "non-installato";
+  return {
+    testoStato: testoStatoPm(stato),
+    pulsante: pulsantePm(stato),
+    testoInCoda: testoInCodaPm(inCoda),
+    ultimaEsecuzione: installato ? testoUltimaEsecuzionePm(ultimaEsecuzione, adesso) : null,
+  };
+}
+
 export function urlLabelIssue(repo, numero) {
   return `${API_BASE}/repos/${repo}/issues/${numero}/labels`;
 }
