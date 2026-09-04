@@ -205,47 +205,46 @@ jobs:
           MINUTI: ${{ steps.cfg.outputs.attesa_check }}
         run: |
           set -euo pipefail
-          # `gh pr checks --watch` esce 1 tanto quando sulla PR non risulta ancora
-          # nessun check (comune appena aperta: i check impiegano qualche secondo a
-          # comparire) quanto quando i check sono conclusi e almeno uno è fallito
-          # (nel sorgente di gh: SilentError appena Failed > 0). Il codice d'uscita
-          # da solo non distingue i due casi: dopo un'uscita diversa da 0 e da 124
-          # si interroga `gh pr checks --json bucket` (esce sempre 0) per il fatto
-          # osservabile. Lista non vuota vale "conclusi" (verdi o rossi, li smista
-          # la prossima scansione); lista vuota vale "nessun check" e si ritenta
-          # finché non ne compare uno o scade il tetto, che deve coprire tanto i
-          # check lenti quanto quelli che non compaiono ancora (REQ-215).
+          # Il run di pm-agent.yml svegliato dall'evento pull_request è registrato da
+          # GitHub come check della PR stessa: aspettarlo insieme agli altri porta
+          # sempre al tetto (osservato sulla PR #68). Si scarta quindi il check
+          # pm-agent da ogni lettura, come raccogli-stato.sh.
+          WORKFLOW_PM="pm-agent"
+          # `gh pr checks --json` esce non-zero anche quando non c'è ancora nessun
+          # check registrato (populateStatusChecks nel sorgente di gh restituisce
+          # l'errore "no checks reported" prima di arrivare all'exporter JSON), oltre
+          # che per un errore di rete transitorio. Sotto `set -e` un'uscita non-zero
+          # qui ucciderebbe il passo prima di raggiungere il tetto: si tollera il
+          # fallimento e lo si conta come "nessun check visto in questo giro".
+          # Lista (al netto di pm-agent) vuota o con almeno un pending -> si continua
+          # ad aspettare; altrimenti -> conclusi (verdi o rossi, li smista la
+          # prossima scansione). Il tetto deve coprire tanto i check lenti quanto
+          # quelli che non compaiono ancora (REQ-215): se non se n'è mai visto uno
+          # diverso da pm-agent, allo scadere è "nessun-check", altrimenti
+          # "tetto-superato".
           SCADENZA=$(( $(date +%s) + MINUTI * 60 ))
           ESITO=""
+          VISTO_CHECK=false
           while [ -z "$ESITO" ]; do
-            RESTANTI=$(( SCADENZA - $(date +%s) ))
-            if [ "$RESTANTI" -le 0 ]; then
-              ESITO="nessun-check"
+            if [ "$(date +%s)" -ge "$SCADENZA" ]; then
+              if [ "$VISTO_CHECK" = true ]; then
+                ESITO="tetto-superato"
+              else
+                ESITO="nessun-check"
+              fi
               break
             fi
-            set +e
-            timeout "${RESTANTI}s" gh pr checks "$NUMERO" --watch
-            WESITO=$?
-            set -e
-            if [ "$WESITO" -eq 0 ]; then
-              ESITO="conclusi"
-            elif [ "$WESITO" -eq 124 ]; then
-              ESITO="tetto-superato"
+            ALTRI=$( (gh pr checks "$NUMERO" --json bucket,workflow | jq -c --arg wf "$WORKFLOW_PM" \
+              '[.[] | select(.workflow != $wf)]') 2>/dev/null || echo '[]')
+            if [ "$(echo "$ALTRI" | jq 'length')" -eq 0 ]; then
+              sleep 15
+              continue
+            fi
+            VISTO_CHECK=true
+            if echo "$ALTRI" | jq -e 'any(.[]; .bucket == "pending")' >/dev/null; then
+              sleep 15
             else
-              # `gh pr checks --json` esce non-zero anche quando non c'è ancora
-              # nessun check registrato (populateStatusChecks nel sorgente di gh
-              # restituisce l'errore "no checks reported" prima di arrivare
-              # all'exporter JSON), oltre che per un errore di rete transitorio.
-              # Sotto `set -e` un'uscita non-zero qui ucciderebbe il passo prima
-              # di raggiungere il tetto: si tollera il fallimento e lo si conta
-              # come "nessun check visto in questo giro", come fa già
-              # raccogli-stato.sh per la stessa chiamata.
-              CONTEGGIO=$(gh pr checks "$NUMERO" --json bucket --jq 'length' 2>/dev/null || echo 0)
-              if [ "$CONTEGGIO" -gt 0 ]; then
-                ESITO="conclusi"
-              else
-                sleep 5
-              fi
+              ESITO="conclusi"
             fi
           done
 
