@@ -1,74 +1,57 @@
 ## Cosa ho fatto
 
-Il comando «Avvia» del contratto (`contracts/comandi-pm.md`, L4 poi S2 poi S3): dalla riga del PM
-che T003 già mostra, un click chiede conferma nominando il repo, e solo confermando abilita
-`pm-agent.yml` e lancia subito dopo il giro di recupero sul ramo di default letto da GitHub, mai
-una costante (ADR `2026-09-04-1900-ramo-del-giro-di-recupero.md`).
+L'avviso "lavoro in attesa" del contratto (`contracts/comandi-pm.md`, ultima sezione) e di
+REQ-420/421: quando il PM di un repo è spento e c'è lavoro che nessuno sta guardando, la riga del
+PM che T003 già mostra include un avviso che nomina quel lavoro per tipo.
 
-- `ui/lib.js`: `urlRepoInfo(repo)` (L4, `GET /repos/REPO`), `urlAbilitaPm(repo)` (S2,
-  `PUT .../enable`), `urlGiroDiRecuperoPm(repo)` (S3, `POST .../dispatches`);
-  `messaggioConfermaAvvia(repo)`, nella stessa forma nativa di `messaggioConfermaRisposta`
-  (ADR `2026-09-03-1425`), che nomina il repo e dice che il giro di recupero chiama il modello;
-  `esitoAvvia(abilitazioneRiuscita, giroDiRecuperoRiuscito)`, la funzione pura che riduce i tre
-  esiti del contratto a `riuscito`, `solo-abilitato`, `non-abilitato`; e tre fasi nuove
-  (`FASE_RAMO_DEFAULT`, `FASE_ABILITAZIONE`, `FASE_GIRO_DI_RECUPERO`) aggiunte al dizionario già
-  usato da `messaggioErroreFase` per «Rispondi e riavvia», così il messaggio nomina sempre quale
-  delle chiamate ha fallito con lo stesso meccanismo già in uso.
-- `ui/github.js`: `ramoDefaultRepo`, `abilitaPm`, `avviaGiroDiRecuperoPm` (le tre chiamate sottili)
-  e `avviaPm(token, repo)`, che le compone in ordine fisso L4 → S2 → S3. Un fallimento di L4 o di
-  S2 solleva `ErroreFase` e ferma tutto prima di abilitare qualunque cosa (non viene tentata né
-  l'abilitazione né il giro); un fallimento di S3 **non** solleva un'eccezione — l'abilitazione è
-  già avvenuta e il PM resta acceso — ma torna nel risultato (`{ esito: "solo-abilitato", errore
-  }`), riusando `esitoAvvia` e `messaggioErroreFase(FASE_GIRO_DI_RECUPERO, ...)`.
-- `ui/index.html`: `gestisciAvviaPm(repo, pulsante)` collegato al pulsante «Avvia» in
-  `costruisciRigaPm` (quello di «Ferma» esisteva già da T004). Chiede conferma con
-  `window.confirm(messaggioConfermaAvvia(repo))` **prima** di disabilitare il pulsante o toccare
-  la rete — annullare non fa partire nulla. Confermato, disabilita il pulsante, chiama `avviaPm` e:
-  a `riuscito` o `solo-abilitato` salva l'esito in `statoEsitoAvvioPm` e richiama `caricaPm()`
-  (lo stato si aggiorna subito, senza attendere il ciclo dei sessanta secondi); su `ErroreFase` o
-  `ErroreGitHub` marca la sezione del repo come non aggiornata con `aggiornaStatoRepo`, come già fa
-  `gestisciFermaPm`. Il messaggio di un `solo-abilitato` compare accanto alla riga del PM.
+- `ui/lib.js`: `lavoroInAttesa(issues, prs)`, la funzione pura del contratto — filtra dai dati che
+  `caricaAvanzamento` scarica già per la tabella di REQ-120 (spec 002), nessuna chiamata nuova:
+  `prDaRevisionare` (PR aperte con `needs-review`), `domande` (issue aperte con `needs-human`
+  escluse quelle con `rapporto-pm`) e `inCoda` (issue aperte con `in-coda`), più `totale`. E
+  `avvisoPmSpento(stato, lavoro)`, che riduce le due condizioni di REQ-420/421 a un solo punto:
+  torna l'oggetto del lavoro solo con `stato === "spento"` e `totale > 0`, altrimenti `null` — con
+  `"acceso"` o `"non-installato"` non compare mai, qualunque sia il lavoro in attesa.
+- `ui/index.html`: `caricaAvanzamento` calcola `lavoroInAttesa(issueAperteRepo, prRepo)` insieme
+  alla classificazione già esistente e lo salva nello stesso stato di sezione (`statoAvanzamentoRepo`),
+  senza nessuna richiesta in più. `costruisciRigaPm` riceve il nuovo `lavoro` e, quando
+  `avvisoPmSpento` non torna `null`, aggiunge accanto all'interruttore un blocco con lo stesso stile
+  ambra già usato da «Aspettano te», con un gruppo per tipo (PR da revisionare, Domande, Task in
+  coda) che nomina ogni elemento con link e titolo — non solo il conteggio.
 
 ## Come l'ho verificato
 
-`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 252 test, tutti verdi (18 nuovi
-in `ui/avvia-pm.test.js`, nessuna fixture nuova: i corpi delle risposte usati bastano inline).
-Copro: le tre URL di L4/S2/S3; il testo della conferma (nomina il repo, dice che il giro chiama il
-modello); i tre esiti di `esitoAvvia` in ogni combinazione; i tre messaggi di
-`messaggioErroreFase` per le fasi nuove; le tre chiamate sottili una per una; e `avviaPm` con
-`fetch` finti che registrano `url`/`method`/`body` di ogni chiamata — l'ordine L4→S2→S3 con il
-`ref` del dispatch uguale al ramo letto (non una costante), L4 che fallisce e non abilita nulla,
-S2 che fallisce e non tenta S3, S3 che fallisce e torna `solo-abilitato` senza rigettare, e il
-token mancante che non tocca `fetch`. Sintassi di `index.html` verificata con `node --check` dopo
-averne estratto lo script. Verifica manuale sul codice per il resto (nessun token con
-`Actions: read and write` disponibile per una prova end-to-end contro GitHub vero — T008, manuale
-di Alessio, non è ancora fatto): il pulsante si disabilita solo dopo la conferma, quindi due click
-rapidi dopo aver confermato non producono due richieste; tutte le chiamate passano da
-`richiesta()` verso `API_BASE` (`https://api.github.com`).
+`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 265 test, tutti verdi (14 nuovi
+in `ui/avviso-pm-spento.test.js`, nessuna fixture nuova: gli oggetti issue/PR inline bastano, come
+in `classifica.test.js`). Copro: `lavoroInAttesa` con lavoro vuoto, una PR `needs-review` nominata
+nel risultato, una PR chiusa che non conta, una issue `needs-human` che finisce in `domande`, una
+issue con sia `needs-human` sia `rapporto-pm` che non viene contata, una issue `in-coda` aperta e
+una chiusa, una PR mischiata nell'elenco issue che non conta, e il totale che somma le tre
+categorie; `avvisoPmSpento` con PM spento e lavoro (avviso presente e nomina la PR), PM acceso con
+tre PR in attesa (nessun avviso), PM spento senza nulla in attesa (nessun avviso) e
+`non-installato` (nessun avviso). Sintassi di `index.html` verificata con `node --check` dopo averne
+estratto lo script. Verifica manuale sul codice per il resto: T008 (allargare il token del Registro
+a `Actions: read and write`) è manuale di Alessio e non ancora fatto, quindi non ho potuto aprire la
+pagina contro un repo vero con PM spento e lavoro accumulato.
 
 ## Decisioni
 
-Nessun ADR: il contratto e il piano coprivano già le tre chiamate, il loro ordine fisso, i tre
-esiti e la forma della conferma (ADR `2026-09-03-1425`) e la scelta del ramo (ADR
-`2026-09-04-1900`). Le sole scelte lasciate aperte — il testo esatto della conferma e delle tre
-descrizioni di fase — sono testo dell'interfaccia senza alternative in gioco, della stessa natura
-di quelle già scelte senza ADR nei task precedenti (`testoStatoPm`, `testoEsecuzioniInCorsoPm`).
-Ho riusato il meccanismo di `ErroreFase`/`messaggioErroreFase` già introdotto per «Rispondi e
-riavvia» invece di inventarne uno nuovo per «Avvia»: stesso bisogno (dire quale delle chiamate in
-sequenza ha fallito), stessa soluzione.
+Nessun ADR: il contratto fissava già la firma di `lavoroInAttesa` e la condizione di
+`avvisoPmSpento` (spento e totale > 0). L'unica scelta lasciata aperta — come raggruppare e
+presentare il conteggio per tipo nell'avviso — è testo e struttura dell'interfaccia senza
+alternative in gioco, della stessa natura di quelle già scelte senza ADR nei task precedenti
+(`testoStatoPm`, `testoEsecuzioniInCorsoPm`): ho riusato lo stile ambra già presente in
+`#aspettanoTe` invece di introdurne uno nuovo.
 
 ## Non fatto
 
-L'avviso "lavoro in attesa" di REQ-420/421 è T006, non di questo task. I messaggi d'errore
-specifici del contratto (403 che nomina `Actions: read and write`, 404 che dice che il workflow
-non è installato, 401 che rimanda a «Configurazione») sono T007: qui un fallimento di L4/S2 mostra
-il messaggio di fase con il testo generico già prodotto da `messaggioErroreHttp`/`ErroreGitHub`.
-Non ho potuto verificare contro l'API vera di GitHub in scrittura: serve il token con
-`Actions: read and write` di T008, ancora da fare a mano da Alessio; la verifica sopra è sulla
+I messaggi d'errore specifici del contratto (403 che nomina `Actions: read and write`, 404 che
+dice che il workflow non è installato, 401 che rimanda a «Configurazione») sono T007, non di questo
+task. Non ho potuto verificare l'avviso contro l'API vera di GitHub con un token che ha
+`Actions: read and write`: serve T008, ancora da fare a mano da Alessio; la verifica sopra è sulla
 suite automatica e sulla lettura del codice.
 
 ## Fatto in più
 
 Nulla: solo i file elencati dalla issue.
 
-Closes #76
+Closes #77
