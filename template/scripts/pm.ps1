@@ -11,6 +11,10 @@ $ErrorActionPreference = "Stop"
 $WorkflowPm = "pm-agent.yml"
 $LimiteElenco = 1000
 
+function Da-Json($testo) {
+    return @((($testo -join "") | ConvertFrom-Json) | ForEach-Object { $_ })
+}
+
 function Ottieni-Repo {
     $repo = gh repo view --json nameWithOwner -q .nameWithOwner
     if ($LASTEXITCODE -ne 0) {
@@ -26,7 +30,7 @@ function Conta-Pr {
     if ($LASTEXITCODE -ne 0) {
         throw "Impossibile elencare le PR con etichetta '$Label'."
     }
-    return @($json | ConvertFrom-Json).Count
+    return @(Da-Json $json).Count
 }
 
 function Conta-Issue {
@@ -36,7 +40,7 @@ function Conta-Issue {
     if ($LASTEXITCODE -ne 0) {
         throw "Impossibile elencare le issue con etichetta '$Label'."
     }
-    return @($json | ConvertFrom-Json).Count
+    return @(Da-Json $json).Count
 }
 
 function Conta-DomandeInAttesa {
@@ -44,7 +48,7 @@ function Conta-DomandeInAttesa {
     if ($LASTEXITCODE -ne 0) {
         throw "Impossibile elencare le issue con etichetta 'needs-human'."
     }
-    $issue = @($json | ConvertFrom-Json)
+    $issue = @(Da-Json $json)
     $filtrate = @($issue | Where-Object {
         $nomiEtichette = @($_.labels | ForEach-Object { $_.name })
         -not ($nomiEtichette -contains "rapporto-pm")
@@ -80,7 +84,7 @@ function Invoca-Ferma {
     if ($LASTEXITCODE -ne 0) {
         throw "Impossibile elencare le esecuzioni in corso."
     }
-    $esecuzioni = @($json | ConvertFrom-Json)
+    $esecuzioni = @(Da-Json $json)
     if ($esecuzioni.Count -eq 0) {
         Write-Host "Nessuna esecuzione in corso."
     } else {
@@ -123,7 +127,7 @@ function Invoca-Stato {
     if ($LASTEXITCODE -ne 0) {
         throw "Impossibile leggere l'ultima esecuzione di $WorkflowPm."
     }
-    $esecuzioni = @($json | ConvertFrom-Json)
+    $esecuzioni = @(Da-Json $json)
     if ($esecuzioni.Count -eq 0) {
         Write-Host "Ultima esecuzione: nessuna."
     } else {
