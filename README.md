@@ -16,7 +16,7 @@ avvia il lavoro.
     .specify/memory/constitution.md   principi non negoziabili
     specs/001-dev-loop/spec.md        specifica della v1, con open point e debito noto
     docs/decisions/                   registro decisioni, formato MADR 4.0
-    plugin/                           plugin Claude Code con la skill dev-agent
+    plugin/                           i tre ruoli: analista, dev-agent, pm-agent
     template/                         file che init copia nel repo di destinazione
     init.sh                           installatore
 
@@ -35,6 +35,7 @@ token, e proteggere il branch principale.
 
 ## Il plugin
 
+I tre ruoli stanno in `plugin/skills/`: `analista`, `dev-agent`, `pm-agent`.
 Il ruolo `dev-agent` sta in `plugin/skills/dev-agent/SKILL.md`. `init` lo copia nel
 repo di destinazione sotto `.claude/skills/dev-agent/SKILL.md`, dove Claude Code lo
 trova come `/dev-agent` — è così che i workflow lo invocano.
@@ -43,9 +44,34 @@ La cartella `plugin/` esiste per un impacchettamento futuro come plugin vero: in
 la skill viaggia dentro il repo di destinazione, che è più semplice da collaudare e
 lascia il ruolo versionato insieme al codice che governa.
 
+## L'analista
+
+Il ruolo che viene prima del codice. `/analista`, in una sessione Claude Code aperta sul
+repo, prende un'idea detta in due righe e la porta fino a una coda di task: fa domande
+chiuse, poche per volta, e scrive ogni risposta nella sezione «Chiarimenti» della spec;
+quando non ha più domande produce `specs/<NNN>-*/` con i comandi di Spec Kit e apre una PR.
+
+Non riempie i buchi. Se un'informazione manca e Alessio non la dà, resta un punto aperto
+dichiarato: o si rinvia a una spec successiva, o si restringe l'ambito.
+
+Fra l'analisi e la coda c'è un cancello che non dipende dal giudizio del modello:
+
+```bash
+node scripts/analista-cancello.js specs/004-analista
+```
+
+Elenca i problemi bloccanti — punti aperti, requisiti senza verifica, task senza criteri o
+senza rimando a un requisito, requisiti che nessun task copre, `test_command` vuoto, task su
+percorsi che l'agente sviluppatore non può scrivere — ed esce 1 se ce n'è almeno uno. Verde
+non basta: le issue nascono solo dopo una conferma esplicita, con `/analista consegna`, e a
+spec fusa su `main`.
+
+L'analista **non accende la fucina**: finisce dicendo ad Alessio di dare
+`scripts/pm.ps1 avvia`. È l'ultima valvola umana (P4).
+
 ## Il PM a cicli
 
-Un secondo ruolo, `pm-agent`, che porta avanti la coda dei task al posto di una
+Il terzo ruolo, `pm-agent`, porta avanti la coda dei task al posto di una
 persona: prende la prossima issue `in-coda`, la avvia (`ready-for-dev`), revisiona
 ogni PR che l'agente sviluppatore apre contro la specifica, la fonde o la rimanda
 con un commento, risponde alle domande che trova in `needs-human`, e riferisce ad

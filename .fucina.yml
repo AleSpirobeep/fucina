@@ -12,6 +12,37 @@ agente:
   max_budget_usd: 3.00
   max_iterazioni: 3
 
+# Configurazione dell'analista (skill /analista, sessione locale di Claude Code).
+# Può mancare del tutto: ha default sensati. Non è un workflow — non consuma nulla
+# finché non lo invochi, e non fa partire niente da solo.
+analista:
+  modello: "claude-sonnet-5"    # default: claude-sonnet-5
+  max_turns: 80                 # default: 80 (un'analisi è fatta di giri di domande)
+  max_budget_usd: 3.00          # default: 3.00
+  max_domande_per_giro: 5       # default: 5
+  # Strumenti dell'analista: legge tutto, scrive solo documenti, e su GitHub fa due
+  # cose sole — la PR della spec e le issue "in-coda". Mai accendere la fucina:
+  # niente gh workflow, niente ready-for-dev, niente merge (REQ-351).
+  strumenti_permessi:
+    - "Read"
+    - "Glob"
+    - "Grep"
+    - "Write"
+    - "Edit"
+    - "Bash(node:*)"
+    - "Bash(git:*)"
+    - "Bash(gh issue view:*)"
+    - "Bash(gh issue list:*)"
+    - "Bash(gh issue create:*)"
+    - "Bash(gh pr view:*)"
+    - "Bash(gh pr create:*)"
+
+# Il PM a cicli (spec 003): Opus 5 alla revisione, l'unico punto senza check a valle.
+pm:
+  modello: "claude-opus-5"
+  max_turns: 40
+  max_budget_usd: 5.00
+
 strumenti_permessi:
   - "Edit"
   - "Write"

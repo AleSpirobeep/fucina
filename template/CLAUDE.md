@@ -14,7 +14,16 @@
 - `specs/` — cosa il progetto deve fare
 - `docs/decisions/` — perché è fatto così. **Non contraddire un ADR accettato:**
   se una decisione va cambiata, si scrive un ADR nuovo con `status: superseded by ...`
-- `.fucina.yml` — configurazione degli agenti, compreso il PM sotto la chiave `pm`
+- `.fucina.yml` — configurazione degli agenti: il PM sotto la chiave `pm`,
+  l'analista sotto `analista`
+
+## L'analista
+
+Prima del codice c'è l'analisi: la skill `/analista` porta un'idea fino a
+`specs/<NNN>-*/` e alle issue `in-coda`, fermandosi a chiedere quando l'idea ha buchi.
+Non accende niente. Il cancello che separa l'analisi dalla coda è
+`node scripts/analista-cancello.js specs/<NNN>-<nome>`: se esce diverso da zero, la
+spec non è consegnabile, e non si aggira.
 
 ## Il PM a cicli
 
