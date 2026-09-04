@@ -403,6 +403,40 @@ export function contaInCoda(issues) {
   }).length;
 }
 
+// contracts/comandi-pm.md — il lavoro in attesa, dai dati già scaricati per la tabella
+// di REQ-120 (spec 002): nessuna chiamata nuova (REQ-420).
+export function lavoroInAttesa(issues, prs) {
+  const prDaRevisionare = (prs || []).filter(
+    (pr) => pr.state === "open" && nomiLabel(pr).includes("needs-review"),
+  );
+
+  const issueAperte = (issues || []).filter(
+    (issue) => !issue.pull_request && issue.state === "open",
+  );
+
+  const domande = issueAperte.filter((issue) => {
+    const nomi = nomiLabel(issue);
+    return nomi.includes("needs-human") && !nomi.includes("rapporto-pm");
+  });
+
+  const inCoda = issueAperte.filter((issue) => nomiLabel(issue).includes("in-coda"));
+
+  return {
+    prDaRevisionare,
+    domande,
+    inCoda,
+    totale: prDaRevisionare.length + domande.length + inCoda.length,
+  };
+}
+
+// contracts/comandi-pm.md — l'avviso compare solo con il PM spento e lavoro in attesa
+// (REQ-420); con «acceso» o «non-installato» non compare mai, qualunque sia il lavoro
+// (REQ-421).
+export function avvisoPmSpento(stato, lavoro) {
+  if (stato !== "spento" || !lavoro || lavoro.totale === 0) return null;
+  return lavoro;
+}
+
 export function tabellaAvanzamento(classificazione) {
   return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
     const elementi = (classificazione[chiave] || []).map((elemento) => ({

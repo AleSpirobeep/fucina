@@ -176,6 +176,30 @@
         padding-top: 0.25rem;
       }
 
+      .avviso-pm-spento {
+        margin-top: 0.5rem;
+        background: var(--colore-ambra-sfondo);
+        border: 1px solid var(--colore-ambra-bordo);
+        border-left: 0.4rem solid var(--colore-ambra);
+        color: var(--colore-ambra-testo);
+        border-radius: 0.3rem;
+        padding: 0.6rem 0.8rem;
+      }
+
+      .avviso-pm-spento a {
+        color: var(--colore-ambra-testo);
+      }
+
+      .avviso-pm-spento ul {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 0.5rem;
+      }
+
+      .avviso-pm-spento p {
+        margin: 0.3rem 0;
+      }
+
       .rispondi-form {
         display: flex;
         flex-direction: column;
@@ -329,6 +353,8 @@
         messaggioStatoPmNonAggiornato,
         testoEsecuzioniInCorsoPm,
         messaggioConfermaAvvia,
+        lavoroInAttesa,
+        avvisoPmSpento,
       } from "./lib.js";
       import {
         issueAperte,
@@ -503,7 +529,49 @@
         return div;
       }
 
-      function costruisciRigaPm(inCoda, pmVoce, adesso, repo) {
+      function costruisciGruppoAvviso(etichetta, elementi) {
+        if (elementi.length === 0) return null;
+        const div = document.createElement("div");
+        const p = document.createElement("p");
+        p.textContent = `${etichetta} (${elementi.length}):`;
+        div.appendChild(p);
+        const elenco = document.createElement("ul");
+        for (const elemento of elementi) {
+          const voce = document.createElement("li");
+          const link = document.createElement("a");
+          link.href = elemento.html_url;
+          link.textContent = elemento.title;
+          voce.appendChild(link);
+          elenco.appendChild(voce);
+        }
+        div.appendChild(elenco);
+        return div;
+      }
+
+      // REQ-420, 421: l'avviso compare solo con il PM spento e lavoro in attesa,
+      // e nomina ogni elemento in attesa per tipo.
+      function costruisciAvvisoPmSpento(avviso) {
+        const div = document.createElement("div");
+        div.className = "avviso-pm-spento";
+        div.setAttribute("role", "alert");
+
+        const titolo = document.createElement("p");
+        titolo.textContent = `Lavoro in attesa (${avviso.totale}):`;
+        div.appendChild(titolo);
+
+        for (const [etichetta, elementi] of [
+          ["PR da revisionare", avviso.prDaRevisionare],
+          ["Domande", avviso.domande],
+          ["Task in coda", avviso.inCoda],
+        ]) {
+          const gruppo = costruisciGruppoAvviso(etichetta, elementi);
+          if (gruppo) div.appendChild(gruppo);
+        }
+
+        return div;
+      }
+
+      function costruisciRigaPm(inCoda, lavoro, pmVoce, adesso, repo) {
         if (!pmVoce) return null;
 
         const div = document.createElement("div");
@@ -555,6 +623,9 @@
           if (esitoAvvio && esitoAvvio.errore) {
             aggiungiMessaggioErrore(div, esitoAvvio.errore);
           }
+
+          const avviso = avvisoPmSpento(stato, lavoro);
+          if (avviso) div.appendChild(costruisciAvvisoPmSpento(avviso));
         }
 
         if (pmVoce.nonAggiornato) {
@@ -573,7 +644,13 @@
 
           if (voce.dati) {
             const sezione = costruisciTabellaRepo(repo, voce.dati.classificazione);
-            const rigaPmEl = costruisciRigaPm(voce.dati.inCoda, statoPmRepo[repo], adesso, repo);
+            const rigaPmEl = costruisciRigaPm(
+              voce.dati.inCoda,
+              voce.dati.lavoro,
+              statoPmRepo[repo],
+              adesso,
+              repo,
+            );
             if (rigaPmEl) sezione.appendChild(rigaPmEl);
             if (voce.nonAggiornato) marcaSezioneNonAggiornata(sezione, voce.errore);
             tabelleAvanzamento.appendChild(sezione);
@@ -603,7 +680,11 @@
             );
             statoAvanzamentoRepo = aggiornaStatoRepo(statoAvanzamentoRepo, repo, {
               ok: true,
-              dati: { classificazione, inCoda: contaInCoda(issueAperteRepo) },
+              dati: {
+                classificazione,
+                inCoda: contaInCoda(issueAperteRepo),
+                lavoro: lavoroInAttesa(issueAperteRepo, prRepo),
+              },
             });
           } catch (errore) {
             const messaggio =
