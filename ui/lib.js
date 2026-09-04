@@ -336,6 +336,62 @@ export function formattaOra(iso) {
   return `${due(d.getHours())}:${due(d.getMinutes())}:${due(d.getSeconds())}`;
 }
 
+// contracts/comandi-pm.md — la riga del PM nella sezione che l'avanzamento
+// già costruisce per ogni repo: stato, task in-coda, ultima esecuzione e un
+// solo pulsante (REQ-401, 402, 410). Nessuno dei sei conteggi di
+// COLONNE_AVANZAMENTO viene ripetuto qui.
+const TESTO_STATO_PM = {
+  acceso: "PM: acceso",
+  spento: "PM: spento",
+  "non-installato": "PM non installato",
+};
+
+const PULSANTE_PM = {
+  acceso: "Ferma",
+  spento: "Avvia",
+};
+
+export function testoStatoPm(stato) {
+  return TESTO_STATO_PM[stato] || TESTO_STATO_PM["non-installato"];
+}
+
+export function pulsantePm(stato) {
+  return PULSANTE_PM[stato] || null;
+}
+
+export function testoInCodaPm(numero) {
+  return `In coda: ${numero}`;
+}
+
+export function testoUltimaEsecuzionePm(ultimaEsecuzione, adesso) {
+  if (!ultimaEsecuzione || ultimaEsecuzione.esito === "nessuna") {
+    return "Ultima esecuzione: nessuna";
+  }
+  const trascorso = formattaTempoTrascorso(ultimaEsecuzione.data, adesso);
+  return `Ultima esecuzione: ${ultimaEsecuzione.esito} (${trascorso} fa)`;
+}
+
+// REQ-403: quando la lettura dello stato del PM fallisce, la riga lo dice
+// invece di mostrare il dato precedente come se fosse nuovo.
+export function messaggioStatoPmNonAggiornato(errore) {
+  return `Stato del PM non aggiornato: ${errore}`;
+}
+
+// Un non-installato non ha un'ultima esecuzione da mostrare (REQ-404).
+export function rigaPm(stato, inCoda, ultimaEsecuzione, adesso) {
+  const conUltimaEsecuzione = stato !== "non-installato";
+  return {
+    stato,
+    testoStato: testoStatoPm(stato),
+    pulsante: pulsantePm(stato),
+    testoInCoda: testoInCodaPm(inCoda),
+    ultimaEsecuzione: conUltimaEsecuzione ? ultimaEsecuzione : null,
+    testoUltimaEsecuzione: conUltimaEsecuzione
+      ? testoUltimaEsecuzionePm(ultimaEsecuzione, adesso)
+      : null,
+  };
+}
+
 // Stato per repo di una sezione della dashboard: su un errore i dati della
 // chiamata precedente restano (REQ-122 chiede di non farli sparire), solo
 // marcati come non aggiornati.

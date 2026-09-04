@@ -237,6 +237,22 @@
         padding-left: 1.1rem;
       }
 
+      .riga-pm {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 1rem;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--colore-bordo);
+        font-family: var(--font-dati);
+        font-size: 0.85rem;
+      }
+
+      .riga-pm button {
+        margin-left: auto;
+      }
+
       label {
         font-family: var(--font-titoli);
         font-size: 0.9rem;
@@ -324,6 +340,9 @@
         testoRispostaValido,
         messaggioConfermaRisposta,
         messaggioErroreFase,
+        contaInCoda,
+        rigaPm,
+        messaggioStatoPmNonAggiornato,
       } from "./lib.js";
       import {
         issueAperte,
@@ -334,6 +353,8 @@
         runWorkflow,
         rispondiERiavvia,
         ErroreFase,
+        statoPm,
+        ultimaEsecuzionePm,
       } from "./github.js";
 
       const CHIAVE_TOKEN = "fucina.token";
@@ -358,6 +379,7 @@
       let statoAspettanoTe = creaStatoSezione();
       let statoAvanzamentoRepo = creaStatoSezione();
       let statoAgentiAttiviRepo = creaStatoSezione();
+      let statoPmRepo = creaStatoSezione();
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
@@ -385,7 +407,62 @@
         return sezione;
       }
 
-      function costruisciTabellaRepo(repo, classificazione) {
+      function costruisciRigaPm(pmVoce, adesso) {
+        const contenitore = document.createElement("div");
+        contenitore.className = "riga-pm";
+
+        if (!pmVoce || !pmVoce.dati) {
+          if (pmVoce && pmVoce.errore) {
+            const avviso = document.createElement("p");
+            avviso.setAttribute("role", "alert");
+            avviso.textContent = messaggioStatoPmNonAggiornato(pmVoce.errore);
+            contenitore.appendChild(avviso);
+          }
+          return contenitore;
+        }
+
+        const { stato, inCoda, ultimaEsecuzione } = pmVoce.dati;
+        const riga = rigaPm(stato, inCoda, ultimaEsecuzione, adesso);
+
+        const testoStato = document.createElement("span");
+        testoStato.textContent = riga.testoStato;
+        contenitore.appendChild(testoStato);
+
+        const testoInCoda = document.createElement("span");
+        testoInCoda.textContent = riga.testoInCoda;
+        contenitore.appendChild(testoInCoda);
+
+        if (riga.testoUltimaEsecuzione) {
+          const testoUltima = document.createElement("span");
+          testoUltima.textContent = riga.testoUltimaEsecuzione;
+          if (riga.ultimaEsecuzione && riga.ultimaEsecuzione.url) {
+            testoUltima.append(" ");
+            const link = document.createElement("a");
+            link.href = riga.ultimaEsecuzione.url;
+            link.textContent = "apri";
+            testoUltima.appendChild(link);
+          }
+          contenitore.appendChild(testoUltima);
+        }
+
+        if (riga.pulsante) {
+          const pulsante = document.createElement("button");
+          pulsante.type = "button";
+          pulsante.textContent = riga.pulsante;
+          contenitore.appendChild(pulsante);
+        }
+
+        if (pmVoce.nonAggiornato) {
+          const avviso = document.createElement("p");
+          avviso.setAttribute("role", "alert");
+          avviso.textContent = messaggioStatoPmNonAggiornato(pmVoce.errore);
+          contenitore.appendChild(avviso);
+        }
+
+        return contenitore;
+      }
+
+      function costruisciTabellaRepo(repo, classificazione, pmVoce, adesso) {
         const sezione = costruisciSezioneRepo(repo);
         const tabella = document.createElement("table");
         const righeIntestazione = document.createElement("tr");
@@ -421,17 +498,19 @@
         tabella.appendChild(thead);
         tabella.appendChild(tbody);
         sezione.appendChild(tabella);
+        sezione.appendChild(costruisciRigaPm(pmVoce, adesso));
         return sezione;
       }
 
       function renderAvanzamento(repos) {
         tabelleAvanzamento.innerHTML = "";
+        const adesso = new Date().toISOString();
         for (const repo of repos) {
           const voce = statoAvanzamentoRepo[repo];
           if (!voce) continue;
 
           if (voce.dati) {
-            const sezione = costruisciTabellaRepo(repo, voce.dati);
+            const sezione = costruisciTabellaRepo(repo, voce.dati, statoPmRepo[repo], adesso);
             if (voce.nonAggiornato) marcaSezioneNonAggiornata(sezione, voce.errore);
             tabelleAvanzamento.appendChild(sezione);
           } else {
@@ -471,6 +550,36 @@
               ok: false,
               errore: messaggio,
             });
+          }
+        }
+
+        renderAvanzamento(repos);
+      }
+
+      // REQ-401/402: L1 e L2 del contratto, più il conteggio in-coda dai dati
+      // già scaricati (contaInCoda). Una lettura fallita non tocca la tabella
+      // dell'avanzamento: solo la riga del PM segnala il dato non aggiornato.
+      async function caricaPm() {
+        const token = tokenSalvato();
+        const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
+
+        for (const repo of repos) {
+          try {
+            const stato = await statoPm(token, repo);
+            const [issueAperteRepo, ultimaEsecuzione] = await Promise.all([
+              issueAperte(token, repo),
+              stato === "non-installato" ? Promise.resolve(null) : ultimaEsecuzionePm(token, repo),
+            ]);
+            statoPmRepo = aggiornaStatoRepo(statoPmRepo, repo, {
+              ok: true,
+              dati: { stato, inCoda: contaInCoda(issueAperteRepo), ultimaEsecuzione },
+            });
+          } catch (errore) {
+            const messaggio =
+              errore instanceof ErroreGitHub
+                ? errore.message
+                : "Errore nella lettura dello stato del PM.";
+            statoPmRepo = aggiornaStatoRepo(statoPmRepo, repo, { ok: false, errore: messaggio });
           }
         }
 
@@ -718,6 +827,7 @@
           ["Aspettano te", statoAspettanoTe],
           ["Avanzamento", statoAvanzamentoRepo],
           ["Agenti attivi", statoAgentiAttiviRepo],
+          ["Stato del PM", statoPmRepo],
         ]) {
           for (const [repo, voce] of Object.entries(stato)) {
             if (voce.errore) errori.push(`${repo} (${nomeSezione}): ${voce.errore}`);
@@ -739,12 +849,18 @@
         statoAggiornamento = nuovoStato;
         pulsanteAggiorna.disabled = true;
 
-        await Promise.all([caricaAspettanoTe(), caricaAvanzamento(), caricaAgentiAttivi()]);
+        await Promise.all([
+          caricaAspettanoTe(),
+          caricaAvanzamento(),
+          caricaAgentiAttivi(),
+          caricaPm(),
+        ]);
 
         const haErrori =
           Object.values(statoAspettanoTe).some((voce) => voce.errore) ||
           Object.values(statoAvanzamentoRepo).some((voce) => voce.errore) ||
-          Object.values(statoAgentiAttiviRepo).some((voce) => voce.errore);
+          Object.values(statoAgentiAttiviRepo).some((voce) => voce.errore) ||
+          Object.values(statoPmRepo).some((voce) => voce.errore);
 
         statoAggiornamento = terminaAggiornamento(statoAggiornamento, new Date().toISOString(), haErrori);
         pulsanteAggiorna.disabled = false;
