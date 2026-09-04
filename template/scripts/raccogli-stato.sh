@@ -7,6 +7,10 @@ set -euo pipefail
 
 RAPPORTO="${1:-}"
 
+# I run di pm-agent.yml svegliati da un evento pull_request sono registrati da GitHub
+# come check della PR stessa: vanno ignorati, altrimenti il PM vede sé stesso "in corso".
+WORKFLOW_PM="pm-agent"
+
 ultimo_ha_marcatore() {
   local TIPO="$1" NUM="$2" BODY
   if [ "$TIPO" = "pr" ]; then
@@ -28,7 +32,9 @@ for NUM in $(echo "$PR_BASE" | jq -r '.[].numero'); do
   # Bucket assente (check non ancora registrati) è trattato come "in-corso": subito
   # dopo l'apertura i check impiegano qualche secondo a comparire, e non vanno
   # scambiati per "verde" (R8).
-  BUCKET=$(gh pr checks "$NUM" --json state,bucket --jq '[.[].bucket]' 2>/dev/null || echo '[]')
+  BUCKET=$(gh pr checks "$NUM" --json bucket,workflow \
+    --jq "[.[] | select(.workflow != \"$WORKFLOW_PM\") | .bucket]" 2>/dev/null || echo '[]')
+  echo "$BUCKET" | jq -e . >/dev/null 2>&1 || BUCKET='[]'
   if echo "$BUCKET" | jq -e 'length == 0' >/dev/null; then
     CHECK="in-corso"
   elif echo "$BUCKET" | jq -e 'any(.[]; . == "fail" or . == "cancel")' >/dev/null; then

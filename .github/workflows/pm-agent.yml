@@ -205,47 +205,40 @@ jobs:
           MINUTI: ${{ steps.cfg.outputs.attesa_check }}
         run: |
           set -euo pipefail
-          # `gh pr checks --watch` esce 1 tanto quando sulla PR non risulta ancora
-          # nessun check (comune appena aperta: i check impiegano qualche secondo a
-          # comparire) quanto quando i check sono conclusi e almeno uno è fallito
-          # (nel sorgente di gh: SilentError appena Failed > 0). Il codice d'uscita
-          # da solo non distingue i due casi: dopo un'uscita diversa da 0 e da 124
-          # si interroga `gh pr checks --json bucket` (esce sempre 0) per il fatto
-          # osservabile. Lista non vuota vale "conclusi" (verdi o rossi, li smista
-          # la prossima scansione); lista vuota vale "nessun check" e si ritenta
-          # finché non ne compare uno o scade il tetto, che deve coprire tanto i
-          # check lenti quanto quelli che non compaiono ancora (REQ-215).
+          # I run di questo stesso workflow svegliati da un evento pull_request sono
+          # registrati da GitHub come check della PR (pm-agent/ciclo): con
+          # `gh pr checks --watch` il PM aspettava sé stesso fino al tetto (visto
+          # sulla PR #68). Qui si interroga `gh pr checks --json` a intervalli,
+          # scartando i check di WORKFLOW_PM, e si decide dai fatti (REQ-215):
+          # lista vuota → si aspetta (i check compaiono qualche secondo dopo
+          # l'apertura); almeno un pending → si aspetta; altrimenti → conclusi
+          # (verdi o rossi: li smista la scansione successiva). Allo scadere del
+          # tetto: nessun-check se non è mai comparso un check, tetto-superato
+          # altrimenti. `gh pr checks --json` esce non-zero quando non c'è ancora
+          # nessun check: si tollera e vale come lista vuota.
+          WORKFLOW_PM="pm-agent"
           SCADENZA=$(( $(date +%s) + MINUTI * 60 ))
+          VISTI=false
           ESITO=""
           while [ -z "$ESITO" ]; do
-            RESTANTI=$(( SCADENZA - $(date +%s) ))
-            if [ "$RESTANTI" -le 0 ]; then
-              ESITO="nessun-check"
-              break
+            BUCKET=$(gh pr checks "$NUMERO" --json bucket,workflow \
+              --jq "[.[] | select(.workflow != \"$WORKFLOW_PM\") | .bucket]" 2>/dev/null || echo '[]')
+            echo "$BUCKET" | jq -e . >/dev/null 2>&1 || BUCKET='[]'
+            TOTALI=$(echo "$BUCKET" | jq 'length')
+            PENDENTI=$(echo "$BUCKET" | jq '[.[] | select(. == "pending")] | length')
+            if [ "$TOTALI" -gt 0 ]; then
+              VISTI=true
             fi
-            set +e
-            timeout "${RESTANTI}s" gh pr checks "$NUMERO" --watch
-            WESITO=$?
-            set -e
-            if [ "$WESITO" -eq 0 ]; then
+            if [ "$TOTALI" -gt 0 ] && [ "$PENDENTI" -eq 0 ]; then
               ESITO="conclusi"
-            elif [ "$WESITO" -eq 124 ]; then
-              ESITO="tetto-superato"
-            else
-              # `gh pr checks --json` esce non-zero anche quando non c'è ancora
-              # nessun check registrato (populateStatusChecks nel sorgente di gh
-              # restituisce l'errore "no checks reported" prima di arrivare
-              # all'exporter JSON), oltre che per un errore di rete transitorio.
-              # Sotto `set -e` un'uscita non-zero qui ucciderebbe il passo prima
-              # di raggiungere il tetto: si tollera il fallimento e lo si conta
-              # come "nessun check visto in questo giro", come fa già
-              # raccogli-stato.sh per la stessa chiamata.
-              CONTEGGIO=$(gh pr checks "$NUMERO" --json bucket --jq 'length' 2>/dev/null || echo 0)
-              if [ "$CONTEGGIO" -gt 0 ]; then
-                ESITO="conclusi"
+            elif [ "$(date +%s)" -ge "$SCADENZA" ]; then
+              if [ "$VISTI" = true ]; then
+                ESITO="tetto-superato"
               else
-                sleep 5
+                ESITO="nessun-check"
               fi
+            else
+              sleep "${INTERVALLO_SECONDI:-15}"
             fi
           done
 
