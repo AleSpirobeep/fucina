@@ -324,6 +324,9 @@
         testoRispostaValido,
         messaggioConfermaRisposta,
         messaggioErroreFase,
+        contaInCoda,
+        rigaPm,
+        messaggioStatoPmNonAggiornato,
       } from "./lib.js";
       import {
         issueAperte,
@@ -334,6 +337,8 @@
         runWorkflow,
         rispondiERiavvia,
         ErroreFase,
+        statoPm,
+        ultimaEsecuzionePm,
       } from "./github.js";
 
       const CHIAVE_TOKEN = "fucina.token";
@@ -358,6 +363,7 @@
       let statoAspettanoTe = creaStatoSezione();
       let statoAvanzamentoRepo = creaStatoSezione();
       let statoAgentiAttiviRepo = creaStatoSezione();
+      let statoPmRepo = creaStatoSezione();
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
@@ -424,14 +430,66 @@
         return sezione;
       }
 
+      // REQ-403: se non è ancora arrivato il primo giro di caricaPm() non c'è
+      // niente da mostrare — nessuna riga vuota sotto la tabella (a differenza
+      // di un dato scaduto, che si mostra comunque marcato come tale).
+      function costruisciRigaPm(inCoda, pmVoce, adesso) {
+        if (!pmVoce) return null;
+
+        const div = document.createElement("div");
+        div.className = "riga-pm";
+
+        if (pmVoce.dati) {
+          const { stato, ultimaEsecuzione } = pmVoce.dati;
+          const info = rigaPm(stato, inCoda, ultimaEsecuzione, adesso);
+
+          const statoP = document.createElement("p");
+          statoP.textContent = info.testoStato;
+          div.appendChild(statoP);
+
+          const inCodaP = document.createElement("p");
+          inCodaP.textContent = info.testoInCoda;
+          div.appendChild(inCodaP);
+
+          if (info.ultimaEsecuzione) {
+            const p = document.createElement("p");
+            p.textContent = info.ultimaEsecuzione.testo;
+            if (info.ultimaEsecuzione.url) {
+              p.append(" ");
+              const link = document.createElement("a");
+              link.href = info.ultimaEsecuzione.url;
+              link.textContent = "Vedi esecuzione";
+              p.appendChild(link);
+            }
+            div.appendChild(p);
+          }
+
+          if (info.pulsante) {
+            const pulsante = document.createElement("button");
+            pulsante.type = "button";
+            pulsante.textContent = info.pulsante;
+            div.appendChild(pulsante);
+          }
+        }
+
+        if (pmVoce.nonAggiornato) {
+          aggiungiMessaggioErrore(div, messaggioStatoPmNonAggiornato(pmVoce.errore));
+        }
+
+        return div;
+      }
+
       function renderAvanzamento(repos) {
         tabelleAvanzamento.innerHTML = "";
+        const adesso = new Date().toISOString();
         for (const repo of repos) {
           const voce = statoAvanzamentoRepo[repo];
           if (!voce) continue;
 
           if (voce.dati) {
-            const sezione = costruisciTabellaRepo(repo, voce.dati);
+            const sezione = costruisciTabellaRepo(repo, voce.dati.classificazione);
+            const rigaPmEl = costruisciRigaPm(voce.dati.inCoda, statoPmRepo[repo], adesso);
+            if (rigaPmEl) sezione.appendChild(rigaPmEl);
             if (voce.nonAggiornato) marcaSezioneNonAggiornata(sezione, voce.errore);
             tabelleAvanzamento.appendChild(sezione);
           } else {
@@ -460,7 +518,7 @@
             );
             statoAvanzamentoRepo = aggiornaStatoRepo(statoAvanzamentoRepo, repo, {
               ok: true,
-              dati: classificazione,
+              dati: { classificazione, inCoda: contaInCoda(issueAperteRepo) },
             });
           } catch (errore) {
             const messaggio =
@@ -471,6 +529,32 @@
               ok: false,
               errore: messaggio,
             });
+          }
+        }
+
+        renderAvanzamento(repos);
+      }
+
+      // REQ-401, 402: solo due letture per repo (L1, e L2 se installato) — il
+      // conteggio in-coda arriva da caricaAvanzamento, non da una terza chiamata.
+      async function caricaPm() {
+        const token = tokenSalvato();
+        const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
+
+        for (const repo of repos) {
+          try {
+            const stato = await statoPm(token, repo);
+            const ultimaEsecuzione = stato === "non-installato" ? null : await ultimaEsecuzionePm(token, repo);
+            statoPmRepo = aggiornaStatoRepo(statoPmRepo, repo, {
+              ok: true,
+              dati: { stato, ultimaEsecuzione },
+            });
+          } catch (errore) {
+            const messaggio =
+              errore instanceof ErroreGitHub
+                ? errore.message
+                : "Errore nel caricamento dello stato del PM.";
+            statoPmRepo = aggiornaStatoRepo(statoPmRepo, repo, { ok: false, errore: messaggio });
           }
         }
 
@@ -718,6 +802,7 @@
           ["Aspettano te", statoAspettanoTe],
           ["Avanzamento", statoAvanzamentoRepo],
           ["Agenti attivi", statoAgentiAttiviRepo],
+          ["PM", statoPmRepo],
         ]) {
           for (const [repo, voce] of Object.entries(stato)) {
             if (voce.errore) errori.push(`${repo} (${nomeSezione}): ${voce.errore}`);
@@ -739,12 +824,13 @@
         statoAggiornamento = nuovoStato;
         pulsanteAggiorna.disabled = true;
 
-        await Promise.all([caricaAspettanoTe(), caricaAvanzamento(), caricaAgentiAttivi()]);
+        await Promise.all([caricaAspettanoTe(), caricaAvanzamento(), caricaAgentiAttivi(), caricaPm()]);
 
         const haErrori =
           Object.values(statoAspettanoTe).some((voce) => voce.errore) ||
           Object.values(statoAvanzamentoRepo).some((voce) => voce.errore) ||
-          Object.values(statoAgentiAttiviRepo).some((voce) => voce.errore);
+          Object.values(statoAgentiAttiviRepo).some((voce) => voce.errore) ||
+          Object.values(statoPmRepo).some((voce) => voce.errore);
 
         statoAggiornamento = terminaAggiornamento(statoAggiornamento, new Date().toISOString(), haErrori);
         pulsanteAggiorna.disabled = false;
