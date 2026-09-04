@@ -327,6 +327,7 @@
         contaInCoda,
         rigaPm,
         messaggioStatoPmNonAggiornato,
+        testoEsecuzioniInCorsoPm,
       } from "./lib.js";
       import {
         issueAperte,
@@ -339,6 +340,7 @@
         ErroreFase,
         statoPm,
         ultimaEsecuzionePm,
+        fermaPm,
       } from "./github.js";
 
       const CHIAVE_TOKEN = "fucina.token";
@@ -364,6 +366,7 @@
       let statoAvanzamentoRepo = creaStatoSezione();
       let statoAgentiAttiviRepo = creaStatoSezione();
       let statoPmRepo = creaStatoSezione();
+      let statoEsecuzioniFermaPm = {};
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
@@ -433,7 +436,47 @@
       // REQ-403: se non è ancora arrivato il primo giro di caricaPm() non c'è
       // niente da mostrare — nessuna riga vuota sotto la tabella (a differenza
       // di un dato scaduto, che si mostra comunque marcato come tale).
-      function costruisciRigaPm(inCoda, pmVoce, adesso) {
+      // REQ-411, 416, 417: parte al primo click senza conferma, resta
+      // disabilitato mentre il comando è in corso (evita due richieste da un
+      // doppio click), e aggiorna lo stato mostrato senza attendere il ciclo
+      // dei sessanta secondi.
+      async function gestisciFermaPm(repo, pulsante) {
+        pulsante.disabled = true;
+        try {
+          const esecuzioni = await fermaPm(tokenSalvato(), repo);
+          statoEsecuzioniFermaPm = { ...statoEsecuzioniFermaPm, [repo]: esecuzioni };
+          await caricaPm();
+        } catch (errore) {
+          const messaggio =
+            errore instanceof ErroreGitHub ? errore.message : "Errore nel fermare il PM.";
+          statoPmRepo = aggiornaStatoRepo(statoPmRepo, repo, { ok: false, errore: messaggio });
+          renderAvanzamento(parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || ""));
+        }
+      }
+
+      function costruisciElencoEsecuzioniFerma(esecuzioni) {
+        const div = document.createElement("div");
+        const p = document.createElement("p");
+        p.textContent = testoEsecuzioniInCorsoPm(esecuzioni);
+        div.appendChild(p);
+
+        if (esecuzioni.length > 0) {
+          const elenco = document.createElement("ul");
+          for (const esecuzione of esecuzioni) {
+            const voce = document.createElement("li");
+            const link = document.createElement("a");
+            link.href = esecuzione.url;
+            link.textContent = esecuzione.titolo;
+            voce.appendChild(link);
+            elenco.appendChild(voce);
+          }
+          div.appendChild(elenco);
+        }
+
+        return div;
+      }
+
+      function costruisciRigaPm(inCoda, pmVoce, adesso, repo) {
         if (!pmVoce) return null;
 
         const div = document.createElement("div");
@@ -468,7 +511,15 @@
             const pulsante = document.createElement("button");
             pulsante.type = "button";
             pulsante.textContent = info.pulsante;
+            if (info.pulsante === "Ferma") {
+              pulsante.addEventListener("click", () => gestisciFermaPm(repo, pulsante));
+            }
             div.appendChild(pulsante);
+          }
+
+          const esecuzioniFerma = statoEsecuzioniFermaPm[repo];
+          if (esecuzioniFerma) {
+            div.appendChild(costruisciElencoEsecuzioniFerma(esecuzioniFerma));
           }
         }
 
@@ -488,7 +539,7 @@
 
           if (voce.dati) {
             const sezione = costruisciTabellaRepo(repo, voce.dati.classificazione);
-            const rigaPmEl = costruisciRigaPm(voce.dati.inCoda, statoPmRepo[repo], adesso);
+            const rigaPmEl = costruisciRigaPm(voce.dati.inCoda, statoPmRepo[repo], adesso, repo);
             if (rigaPmEl) sezione.appendChild(rigaPmEl);
             if (voce.nonAggiornato) marcaSezioneNonAggiornata(sezione, voce.errore);
             tabelleAvanzamento.appendChild(sezione);
