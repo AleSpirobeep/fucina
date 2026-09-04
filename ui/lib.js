@@ -145,6 +145,26 @@ export function riduciStatoPm(state) {
   return state === "active" ? "acceso" : "spento";
 }
 
+export function urlUltimaEsecuzionePm(repo) {
+  return `${API_BASE}/repos/${repo}/actions/workflows/pm-agent.yml/runs?per_page=1`;
+}
+
+// contracts/comandi-pm.md — L2: un run concluso espone la propria `conclusion`,
+// uno ancora in corso espone il proprio `status`. Nessun run non è un errore:
+// dà "nessuna" (a differenza del 404 di L1, qui un 404 resta un errore vero).
+export function riduciUltimaEsecuzionePm(runs) {
+  const lista = runs || [];
+  if (lista.length === 0) {
+    return { esito: "nessuna", data: null, url: null };
+  }
+  const run = lista[0];
+  return {
+    esito: run.status === "completed" ? run.conclusion : run.status,
+    data: run.run_started_at,
+    url: run.html_url,
+  };
+}
+
 export function urlLabelIssue(repo, numero) {
   return `${API_BASE}/repos/${repo}/issues/${numero}/labels`;
 }
@@ -260,6 +280,16 @@ export const COLONNE_AVANZAMENTO = [
   { chiave: "bloccate", etichetta: "Bloccate" },
   { chiave: "fatte", etichetta: "Fatte" },
 ];
+
+// REQ-402: conta le issue in-coda dai dati già scaricati per la tabella di
+// REQ-120 (spec 002) — nessuna chiamata nuova, nessun conteggio ripetuto.
+export function contaInCoda(issues) {
+  return (issues || []).filter((issue) => {
+    if (issue.pull_request) return false; // le PR mischiate nell'elenco issue non contano
+    if (issue.state === "closed") return false;
+    return nomiLabel(issue).includes("in-coda");
+  }).length;
+}
 
 export function tabellaAvanzamento(classificazione) {
   return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {

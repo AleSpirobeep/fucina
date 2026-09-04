@@ -10,6 +10,8 @@ import {
   urlRunWorkflow,
   urlStatoPm,
   riduciStatoPm,
+  urlUltimaEsecuzionePm,
+  riduciUltimaEsecuzionePm,
   urlLabelIssue,
   urlRimuoviLabelIssue,
   FASE_COMMENTO,
@@ -78,6 +80,13 @@ export async function statoPm(token, repo) {
     }
     throw errore;
   }
+}
+
+// contracts/comandi-pm.md — L2: a differenza di statoPm, un 404 qui resta un
+// ErroreGitHub vero; "nessuna" arriva solo da workflow_runs vuoto.
+export async function ultimaEsecuzionePm(token, repo) {
+  const dati = await richiesta(urlUltimaEsecuzionePm(repo), token, repo);
+  return riduciUltimaEsecuzionePm(dati.workflow_runs);
 }
 
 export function pubblicaCommento(token, repo, numero, testo) {
