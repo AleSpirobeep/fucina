@@ -15,11 +15,19 @@ import {
   urlFermaPm,
   urlEsecuzioniInCorsoPm,
   riduciEsecuzioniInCorsoPm,
+  urlRepoInfo,
+  urlAbilitaPm,
+  urlGiroDiRecuperoPm,
+  esitoAvvia,
   urlLabelIssue,
   urlRimuoviLabelIssue,
   FASE_COMMENTO,
   FASE_RIMUOVI_NEEDS_HUMAN,
   FASE_AGGIUNGI_READY_FOR_DEV,
+  FASE_RAMO_DEFAULT,
+  FASE_ABILITAZIONE,
+  FASE_GIRO_DI_RECUPERO,
+  messaggioErroreFase,
 } from "./lib.js";
 
 async function richiesta(url, token, repo, opzioni = {}) {
@@ -104,6 +112,58 @@ export async function esecuzioniInCorsoPm(token, repo) {
 export async function fermaPm(token, repo) {
   await richiesta(urlFermaPm(repo), token, repo, { metodo: "PUT" });
   return esecuzioniInCorsoPm(token, repo);
+}
+
+// contracts/comandi-pm.md — L4: letta solo al click su «Avvia», mai a ogni aggiornamento
+// (docs/decisions/2026-09-04-1900-ramo-del-giro-di-recupero.md).
+export async function ramoDefaultRepo(token, repo) {
+  const dati = await richiesta(urlRepoInfo(repo), token, repo);
+  return dati.default_branch;
+}
+
+// contracts/comandi-pm.md — S2.
+export function abilitaPm(token, repo) {
+  return richiesta(urlAbilitaPm(repo), token, repo, { metodo: "PUT" });
+}
+
+// contracts/comandi-pm.md — S3: usa come `ref` il ramo letto da `ramoDefaultRepo`, mai
+// una costante.
+export function avviaGiroDiRecuperoPm(token, repo, ramo) {
+  return richiesta(urlGiroDiRecuperoPm(repo), token, repo, {
+    metodo: "POST",
+    corpo: { ref: ramo },
+  });
+}
+
+// contracts/comandi-pm.md, REQ-413-415: «Avvia» è L4, poi S2, poi S3, in quest'ordine
+// fisso. Un fallimento di L4 o di S2 ferma tutto prima di abilitare (ErroreFase,
+// esito "non-abilitato" per costruzione: S3 non viene nemmeno tentata). Un fallimento di
+// S3 lascia il PM acceso: l'esito "solo-abilitato" torna nel risultato, non come eccezione,
+// perché a differenza degli altri due non è un comando fallito nel suo complesso.
+export async function avviaPm(token, repo) {
+  let ramo;
+  try {
+    ramo = await ramoDefaultRepo(token, repo);
+  } catch (causa) {
+    throw new ErroreFase(FASE_RAMO_DEFAULT, causa);
+  }
+
+  try {
+    await abilitaPm(token, repo);
+  } catch (causa) {
+    throw new ErroreFase(FASE_ABILITAZIONE, causa);
+  }
+
+  try {
+    await avviaGiroDiRecuperoPm(token, repo, ramo);
+  } catch (causa) {
+    return {
+      esito: esitoAvvia(true, false),
+      errore: messaggioErroreFase(FASE_GIRO_DI_RECUPERO, causa.message),
+    };
+  }
+
+  return { esito: esitoAvvia(true, true), errore: null };
 }
 
 export function pubblicaCommento(token, repo, numero, testo) {

@@ -328,6 +328,7 @@
         rigaPm,
         messaggioStatoPmNonAggiornato,
         testoEsecuzioniInCorsoPm,
+        messaggioConfermaAvvia,
       } from "./lib.js";
       import {
         issueAperte,
@@ -341,6 +342,7 @@
         statoPm,
         ultimaEsecuzionePm,
         fermaPm,
+        avviaPm,
       } from "./github.js";
 
       const CHIAVE_TOKEN = "fucina.token";
@@ -367,6 +369,7 @@
       let statoAgentiAttiviRepo = creaStatoSezione();
       let statoPmRepo = creaStatoSezione();
       let statoEsecuzioniFermaPm = {};
+      let statoEsitoAvvioPm = {};
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
@@ -454,6 +457,30 @@
         }
       }
 
+      // REQ-413, 414, 417: chiede conferma nominando il repo, e solo confermando
+      // disabilita il pulsante e lancia L4 -> S2 -> S3, in quest'ordine fisso.
+      // REQ-416: a comando riuscito o parzialmente riuscito lo stato si aggiorna
+      // subito, senza attendere il ciclo dei sessanta secondi.
+      async function gestisciAvviaPm(repo, pulsante) {
+        if (!window.confirm(messaggioConfermaAvvia(repo))) return;
+
+        pulsante.disabled = true;
+        try {
+          const risultato = await avviaPm(tokenSalvato(), repo);
+          statoEsitoAvvioPm = { ...statoEsitoAvvioPm, [repo]: risultato };
+          await caricaPm();
+        } catch (errore) {
+          const messaggio =
+            errore instanceof ErroreFase
+              ? messaggioErroreFase(errore.fase, errore.causa.message)
+              : errore instanceof ErroreGitHub
+                ? errore.message
+                : "Errore nell'avviare il PM.";
+          statoPmRepo = aggiornaStatoRepo(statoPmRepo, repo, { ok: false, errore: messaggio });
+          renderAvanzamento(parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || ""));
+        }
+      }
+
       function costruisciElencoEsecuzioniFerma(esecuzioni) {
         const div = document.createElement("div");
         const p = document.createElement("p");
@@ -513,6 +540,8 @@
             pulsante.textContent = info.pulsante;
             if (info.pulsante === "Ferma") {
               pulsante.addEventListener("click", () => gestisciFermaPm(repo, pulsante));
+            } else if (info.pulsante === "Avvia") {
+              pulsante.addEventListener("click", () => gestisciAvviaPm(repo, pulsante));
             }
             div.appendChild(pulsante);
           }
@@ -520,6 +549,11 @@
           const esecuzioniFerma = statoEsecuzioniFermaPm[repo];
           if (esecuzioniFerma) {
             div.appendChild(costruisciElencoEsecuzioniFerma(esecuzioniFerma));
+          }
+
+          const esitoAvvio = statoEsitoAvvioPm[repo];
+          if (esitoAvvio && esitoAvvio.errore) {
+            aggiungiMessaggioErrore(div, esitoAvvio.errore);
           }
         }
 
