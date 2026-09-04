@@ -277,6 +277,23 @@ export function messaggioErroreHttp(status, repo) {
   return `Richiesta a GitHub fallita (codice ${status}).`;
 }
 
+// contracts/comandi-pm.md — i messaggi delle chiamate L1, L2, L3, L4, S1, S2, S3: in
+// italiano, nominano la causa, mai il token (REQ-430, REQ-431). L1 tratta il proprio
+// 404 come stato "non-installato" prima di arrivare qui (contracts/comandi-pm.md),
+// quindi in pratica solo i suoi codici diversi da 200 e 404 passano da qui.
+export function messaggioErroreComandoPm(status, repo) {
+  if (status === 403) {
+    return "Al token manca il permesso «Actions: read and write». Concedilo nelle impostazioni del token fine-grained su GitHub (Settings → Developer settings → Personal access tokens), poi riprova.";
+  }
+  if (status === 404) {
+    return `Il workflow pm-agent.yml non risulta installato su ${repo}.`;
+  }
+  if (status === 401) {
+    return "Il token non è valido o è scaduto. Aggiornalo in «Configurazione».";
+  }
+  return messaggioErroreHttp(status, repo);
+}
+
 // REQ-130/131: le tre chiamate di "Rispondi e riavvia", nell'ordine in cui vanno eseguite.
 export const FASE_COMMENTO = "commento";
 export const FASE_RIMUOVI_NEEDS_HUMAN = "rimuoviNeedsHuman";

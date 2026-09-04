@@ -1,6 +1,7 @@
 import {
   ErroreGitHub,
   messaggioErroreHttp,
+  messaggioErroreComandoPm,
   interpretaStatoCheckRuns,
   urlIssueAperte,
   urlIssueChiuseDiRecente,
@@ -46,7 +47,8 @@ async function richiesta(url, token, repo, opzioni = {}) {
   });
 
   if (!risposta.ok) {
-    throw new ErroreGitHub(risposta.status, messaggioErroreHttp(risposta.status, repo));
+    const messaggio = (opzioni.messaggioErrore || messaggioErroreHttp)(risposta.status, repo);
+    throw new ErroreGitHub(risposta.status, messaggio);
   }
 
   if (risposta.status === 204) return null;
@@ -83,7 +85,9 @@ export async function runWorkflow(token, repo) {
 // ogni altro codice diverso da 200 resta un ErroreGitHub come le altre letture.
 export async function statoPm(token, repo) {
   try {
-    const dati = await richiesta(urlStatoPm(repo), token, repo);
+    const dati = await richiesta(urlStatoPm(repo), token, repo, {
+      messaggioErrore: messaggioErroreComandoPm,
+    });
     return riduciStatoPm(dati.state);
   } catch (errore) {
     if (errore instanceof ErroreGitHub && errore.codice === 404) {
@@ -96,13 +100,17 @@ export async function statoPm(token, repo) {
 // contracts/comandi-pm.md — L2: a differenza di statoPm, un 404 qui resta un
 // ErroreGitHub vero; "nessuna" arriva solo da workflow_runs vuoto.
 export async function ultimaEsecuzionePm(token, repo) {
-  const dati = await richiesta(urlUltimaEsecuzionePm(repo), token, repo);
+  const dati = await richiesta(urlUltimaEsecuzionePm(repo), token, repo, {
+    messaggioErrore: messaggioErroreComandoPm,
+  });
   return riduciUltimaEsecuzionePm(dati.workflow_runs);
 }
 
 // contracts/comandi-pm.md — L3.
 export async function esecuzioniInCorsoPm(token, repo) {
-  const dati = await richiesta(urlEsecuzioniInCorsoPm(repo), token, repo);
+  const dati = await richiesta(urlEsecuzioniInCorsoPm(repo), token, repo, {
+    messaggioErrore: messaggioErroreComandoPm,
+  });
   return riduciEsecuzioniInCorsoPm(dati.workflow_runs);
 }
 
@@ -110,20 +118,28 @@ export async function esecuzioniInCorsoPm(token, repo) {
 // elenca ciò che finirà il proprio ciclo (REQ-411, 412). L'ordine è fisso: la
 // scrittura per prima, la lettura che ne racconta l'effetto subito dopo.
 export async function fermaPm(token, repo) {
-  await richiesta(urlFermaPm(repo), token, repo, { metodo: "PUT" });
+  await richiesta(urlFermaPm(repo), token, repo, {
+    metodo: "PUT",
+    messaggioErrore: messaggioErroreComandoPm,
+  });
   return esecuzioniInCorsoPm(token, repo);
 }
 
 // contracts/comandi-pm.md — L4: letta solo al click su «Avvia», mai a ogni aggiornamento
 // (docs/decisions/2026-09-04-1900-ramo-del-giro-di-recupero.md).
 export async function ramoDefaultRepo(token, repo) {
-  const dati = await richiesta(urlRepoInfo(repo), token, repo);
+  const dati = await richiesta(urlRepoInfo(repo), token, repo, {
+    messaggioErrore: messaggioErroreComandoPm,
+  });
   return dati.default_branch;
 }
 
 // contracts/comandi-pm.md — S2.
 export function abilitaPm(token, repo) {
-  return richiesta(urlAbilitaPm(repo), token, repo, { metodo: "PUT" });
+  return richiesta(urlAbilitaPm(repo), token, repo, {
+    metodo: "PUT",
+    messaggioErrore: messaggioErroreComandoPm,
+  });
 }
 
 // contracts/comandi-pm.md — S3: usa come `ref` il ramo letto da `ramoDefaultRepo`, mai
@@ -132,6 +148,7 @@ export function avviaGiroDiRecuperoPm(token, repo, ramo) {
   return richiesta(urlGiroDiRecuperoPm(repo), token, repo, {
     metodo: "POST",
     corpo: { ref: ramo },
+    messaggioErrore: messaggioErroreComandoPm,
   });
 }
 
