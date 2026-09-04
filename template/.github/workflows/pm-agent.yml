@@ -205,46 +205,47 @@ jobs:
           MINUTI: ${{ steps.cfg.outputs.attesa_check }}
         run: |
           set -euo pipefail
-          # `gh pr checks --watch` esce 1 tanto quando sulla PR non risulta ancora
-          # nessun check (comune appena aperta: i check impiegano qualche secondo a
-          # comparire) quanto quando i check sono conclusi e almeno uno è fallito
-          # (nel sorgente di gh: SilentError appena Failed > 0). Il codice d'uscita
-          # da solo non distingue i due casi: dopo un'uscita diversa da 0 e da 124
-          # si interroga `gh pr checks --json bucket` (esce sempre 0) per il fatto
-          # osservabile. Lista non vuota vale "conclusi" (verdi o rossi, li smista
-          # la prossima scansione); lista vuota vale "nessun check" e si ritenta
-          # finché non ne compare uno o scade il tetto, che deve coprire tanto i
-          # check lenti quanto quelli che non compaiono ancora (REQ-215).
+          # Il run di pm-agent.yml svegliato dall'evento pull_request è
+          # registrato da GitHub come check della PR stessa
+          # (pm-agent/ciclo (pull_request)): va scartato, o questo passo
+          # aspetterebbe anche sé stesso (issue #69).
+          WORKFLOW_PM="pm-agent"
+          # `gh pr checks --json` esce non-zero anche quando non c'è ancora
+          # nessun check registrato (populateStatusChecks nel sorgente di gh
+          # restituisce l'errore "no checks reported" prima di arrivare
+          # all'exporter JSON), oltre che per un errore di rete transitorio.
+          # Sotto `set -e` un'uscita non-zero qui ucciderebbe il passo prima
+          # di raggiungere il tetto: si tollera il fallimento e lo si conta
+          # come "nessun check visto in questo giro", come fa già
+          # raccogli-stato.sh per la stessa chiamata. Lista vuota o con almeno
+          # un `pending` vale "si continua ad aspettare"; altrimenti (verdi o
+          # rossi, li smista la prossima scansione) vale "conclusi". Il tetto
+          # deve coprire tanto i check lenti quanto quelli che non compaiono
+          # ancora (REQ-215): allo scadere, `nessun-check` se non se n'è mai
+          # visto uno, `tetto-superato` se erano ancora in corso.
           SCADENZA=$(( $(date +%s) + MINUTI * 60 ))
           ESITO=""
+          VISTO_CHECK=false
           while [ -z "$ESITO" ]; do
             RESTANTI=$(( SCADENZA - $(date +%s) ))
             if [ "$RESTANTI" -le 0 ]; then
-              ESITO="nessun-check"
+              if [ "$VISTO_CHECK" = true ]; then
+                ESITO="tetto-superato"
+              else
+                ESITO="nessun-check"
+              fi
               break
             fi
-            set +e
-            timeout "${RESTANTI}s" gh pr checks "$NUMERO" --watch
-            WESITO=$?
-            set -e
-            if [ "$WESITO" -eq 0 ]; then
-              ESITO="conclusi"
-            elif [ "$WESITO" -eq 124 ]; then
-              ESITO="tetto-superato"
+            BUCKET=$(gh pr checks "$NUMERO" --json bucket,workflow --jq \
+              '[.[] | select(.workflow != "'"$WORKFLOW_PM"'") | .bucket]' 2>/dev/null || echo '[]')
+            if echo "$BUCKET" | jq -e 'length == 0' >/dev/null; then
+              sleep 15
             else
-              # `gh pr checks --json` esce non-zero anche quando non c'è ancora
-              # nessun check registrato (populateStatusChecks nel sorgente di gh
-              # restituisce l'errore "no checks reported" prima di arrivare
-              # all'exporter JSON), oltre che per un errore di rete transitorio.
-              # Sotto `set -e` un'uscita non-zero qui ucciderebbe il passo prima
-              # di raggiungere il tetto: si tollera il fallimento e lo si conta
-              # come "nessun check visto in questo giro", come fa già
-              # raccogli-stato.sh per la stessa chiamata.
-              CONTEGGIO=$(gh pr checks "$NUMERO" --json bucket --jq 'length' 2>/dev/null || echo 0)
-              if [ "$CONTEGGIO" -gt 0 ]; then
-                ESITO="conclusi"
+              VISTO_CHECK=true
+              if echo "$BUCKET" | jq -e 'any(.[]; . == "pending")' >/dev/null; then
+                sleep 15
               else
-                sleep 5
+                ESITO="conclusi"
               fi
             fi
           done

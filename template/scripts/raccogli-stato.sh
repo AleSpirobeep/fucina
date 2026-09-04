@@ -6,6 +6,9 @@
 set -euo pipefail
 
 RAPPORTO="${1:-}"
+# Il check registrato dall'evento pull_request sul run stesso di pm-agent.yml
+# (pm-agent/ciclo) non va contato: aspetterebbe sé stesso (issue #69).
+WORKFLOW_PM="pm-agent"
 
 ultimo_ha_marcatore() {
   local TIPO="$1" NUM="$2" BODY
@@ -27,8 +30,10 @@ PR_JSON="[]"
 for NUM in $(echo "$PR_BASE" | jq -r '.[].numero'); do
   # Bucket assente (check non ancora registrati) è trattato come "in-corso": subito
   # dopo l'apertura i check impiegano qualche secondo a comparire, e non vanno
-  # scambiati per "verde" (R8).
-  BUCKET=$(gh pr checks "$NUM" --json state,bucket --jq '[.[].bucket]' 2>/dev/null || echo '[]')
+  # scambiati per "verde" (R8). Il check di pm-agent stesso è scartato: è il run
+  # in corso che sta calcolando questo stato, non un check della PR da attendere.
+  BUCKET=$(gh pr checks "$NUM" --json bucket,workflow --jq \
+    '[.[] | select(.workflow != "'"$WORKFLOW_PM"'") | .bucket]' 2>/dev/null || echo '[]')
   if echo "$BUCKET" | jq -e 'length == 0' >/dev/null; then
     CHECK="in-corso"
   elif echo "$BUCKET" | jq -e 'any(.[]; . == "fail" or . == "cancel")' >/dev/null; then
