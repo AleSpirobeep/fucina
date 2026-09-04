@@ -8,7 +8,7 @@ test_command: 'node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"'
 
 agente:
   modello: "claude-sonnet-5"
-  max_turns: 60
+  max_turns: 90
   max_budget_usd: 3.00
   max_iterazioni: 3
 
