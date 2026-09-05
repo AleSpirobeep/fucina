@@ -528,6 +528,26 @@ export function tabellaAvanzamento(classificazione) {
   });
 }
 
+// specs/006-registro-leggibile/spec.md — REQ-510, 513: l'avanzamento come riga di sette
+// conteggi, le sei colonne di REQ-120 (spec 002) più i task in coda (REQ-402, spec 005, che
+// ora vive qui e non più nella riga del PM). Nessun titolo: quello è il dettaglio di T004.
+// Una voce a conteggio zero non è apribile.
+export function vociAvanzamento(classificazione, inCoda) {
+  const voci = [
+    ...tabellaAvanzamento(classificazione).map(({ chiave, etichetta, conteggio }) => ({
+      chiave,
+      etichetta,
+      conteggio,
+    })),
+    { chiave: "inCoda", etichetta: "In coda", conteggio: inCoda },
+  ];
+  return voci.map((voce) => ({ ...voce, apribile: voce.conteggio > 0 }));
+}
+
+export function testoConteggioAvanzamento(voce) {
+  return `${voce.etichetta} ${voce.conteggio}`;
+}
+
 const STATI_RUN_ATTIVI = new Set(["in_progress", "queued"]);
 
 export function agentiAttivi(runs) {

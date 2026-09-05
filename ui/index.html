@@ -234,30 +234,19 @@
         margin-bottom: 0;
       }
 
-      table {
-        width: 100%;
-        table-layout: fixed;
-        border-collapse: collapse;
+      .conteggi-avanzamento {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.25rem;
+        list-style: none;
+        padding: 0;
+        margin: 0;
         font-family: var(--font-dati);
         font-size: 0.85rem;
       }
 
-      th,
-      td {
-        text-align: left;
-        vertical-align: top;
-        border: 1px solid var(--colore-bordo);
-        padding: 0.4rem 0.5rem;
-      }
-
-      th {
-        background: var(--colore-sfondo);
-        font-weight: 500;
-      }
-
-      td ul {
-        margin: 0;
-        padding-left: 1.1rem;
+      .conteggi-avanzamento summary {
+        cursor: pointer;
       }
 
       label {
@@ -336,7 +325,8 @@
         configurazioneValida,
         parseElencoRepo,
         classifica,
-        tabellaAvanzamento,
+        vociAvanzamento,
+        testoConteggioAvanzamento,
         agentiAttivi,
         formattaTempoTrascorso,
         ultimoCommento,
@@ -471,42 +461,32 @@
         }
       }
 
-      function costruisciTabellaRepo(repo, classificazione) {
+      // REQ-510, 513: sette conteggi in riga, senza titoli. Un conteggio apribile è un
+      // <details> — l'indicatore d'apertura e la reazione al clic sono quelli nativi del
+      // browser; un conteggio a zero resta un testo semplice, che non ha né l'uno né
+      // l'altro. Il contenuto del <details> arriva con T004.
+      function costruisciConteggiAvanzamento(repo, classificazione, inCoda) {
         const sezione = costruisciSezioneRepo(repo);
-        const tabella = document.createElement("table");
-        const righeIntestazione = document.createElement("tr");
-        const righeCorpo = document.createElement("tr");
+        const elenco = document.createElement("ul");
+        elenco.className = "conteggi-avanzamento";
 
-        for (const colonna of tabellaAvanzamento(classificazione)) {
-          const th = document.createElement("th");
-          th.textContent = `${colonna.etichetta} (${colonna.conteggio})`;
-          righeIntestazione.appendChild(th);
-
-          const td = document.createElement("td");
-          if (colonna.elementi.length === 0) {
-            td.textContent = "-";
+        for (const voce of vociAvanzamento(classificazione, inCoda)) {
+          const li = document.createElement("li");
+          if (voce.apribile) {
+            const dettaglio = document.createElement("details");
+            const sommario = document.createElement("summary");
+            sommario.textContent = testoConteggioAvanzamento(voce);
+            dettaglio.appendChild(sommario);
+            li.appendChild(dettaglio);
           } else {
-            const elenco = document.createElement("ul");
-            for (const elemento of colonna.elementi) {
-              const voce = document.createElement("li");
-              const link = document.createElement("a");
-              link.href = elemento.url;
-              link.textContent = elemento.titolo;
-              voce.appendChild(link);
-              elenco.appendChild(voce);
-            }
-            td.appendChild(elenco);
+            const span = document.createElement("span");
+            span.textContent = testoConteggioAvanzamento(voce);
+            li.appendChild(span);
           }
-          righeCorpo.appendChild(td);
+          elenco.appendChild(li);
         }
 
-        const thead = document.createElement("thead");
-        thead.appendChild(righeIntestazione);
-        const tbody = document.createElement("tbody");
-        tbody.appendChild(righeCorpo);
-        tabella.appendChild(thead);
-        tabella.appendChild(tbody);
-        sezione.appendChild(tabella);
+        sezione.appendChild(elenco);
         return sezione;
       }
 
@@ -619,6 +599,9 @@
         return div;
       }
 
+      // REQ-510: la riga del PM torna a occuparsi solo del PM — stato, ultima esecuzione,
+      // comando. Il conteggio in-coda che rigaPm() calcola ancora (usato da altri percorsi)
+      // non viene più mostrato qui: vive nella riga dei sette conteggi, una sola volta.
       function costruisciRigaPm(inCoda, lavoro, pmVoce, adesso, repo) {
         if (!pmVoce) return null;
 
@@ -632,10 +615,6 @@
           const statoP = document.createElement("p");
           statoP.textContent = info.testoStato;
           div.appendChild(statoP);
-
-          const inCodaP = document.createElement("p");
-          inCodaP.textContent = info.testoInCoda;
-          div.appendChild(inCodaP);
 
           if (info.ultimaEsecuzione) {
             const p = document.createElement("p");
@@ -691,7 +670,11 @@
           if (!voce) continue;
 
           if (voce.dati) {
-            const sezione = costruisciTabellaRepo(repo, voce.dati.classificazione);
+            const sezione = costruisciConteggiAvanzamento(
+              repo,
+              voce.dati.classificazione,
+              voce.dati.inCoda,
+            );
             const rigaPmEl = costruisciRigaPm(
               voce.dati.inCoda,
               voce.dati.lavoro,
