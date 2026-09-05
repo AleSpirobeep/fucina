@@ -1,33 +1,41 @@
-La sezione «Agenti attivi» ora compare nel documento solo quando almeno un repo
-configurato ha un'esecuzione in corso o in coda; il conteggio nella riga di stato
-resta sempre presente, in entrambi i casi.
+`estraiTask` cattura ora la casella del task (`- [ ]` o `- [x]`) ed espone `fatto` accanto
+a `manuale`. I due controlli che predicono un blocco futuro del guard —
+`task-su-percorso-protetto` e `task-su-workflow` — saltano i task `fatto`: la PR che
+predicono non esisterà mai più, perché il task è già stato fuso. La copertura dei
+requisiti (`requisito-non-coperto`) resta invariata e continua a contare anche i task
+`fatto`, come richiesto dal punto 3 della issue — escluderli avrebbe scambiato un falso
+positivo con un altro.
 
-- `ui/lib.js`: nuova funzione pura `sezioneAgentiAttiviVisibile(repos, statoAgentiAttiviRepo)`,
-  che guarda i dati già caricati (nessuna chiamata di rete) e dice se almeno un repo ha
-  agenti al lavoro.
-- `ui/index.html`: la `<section id="agentiAttivi">` parte `hidden` e il suo attributo
-  `hidden` viene aggiornato in `renderAgentiAttivi`, ad ogni giro di caricamento, in base
-  a `sezioneAgentiAttiviVisibile`. La riga di stato (`renderRigaStato`, già esistente) non
-  è toccata: continua a mostrare il conteggio degli agenti — incluso «nessun agente al
-  lavoro» — indipendentemente dalla visibilità della sezione.
+`template/scripts/analista-cancello.js` e `scripts/analista-cancello.js` restano
+identici (`git diff --no-index` vuoto). Il file di test del cancello,
+`analista-cancello.test.js`, non è stato toccato: è protetto, e i test nuovi stanno in
+`template/scripts/cancello-task-fatti.test.js` (5 test).
 
-**Verificato con**: `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 341
-test verdi (280 preesistenti, non modificati, più i nuovi di questo task e delle PR
-precedenti della spec 006).
+**Verificato con**: `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 346
+test verdi (341 preesistenti, non modificati, più i 5 nuovi di questo task).
 
-Closes #94
+Closes #107
 
 ## Decisioni
 
-Nessun ADR aggiunto: l'implementazione segue alla lettera REQ-520 e non richiede una
-scelta non coperta dalla spec.
+Nessun ADR aggiunto: la correzione segue alla lettera i quattro punti della issue e non
+richiede una scelta non coperta da essa.
 
 ## Non fatto
 
-Nulla: tutti e tre i criteri di accettazione della issue sono coperti (sezione assente
-senza esecuzioni con riga di stato che dice «nessun agente al lavoro»; sezione che
-compare entro un aggiornamento; conteggio sempre presente in entrambi i casi).
+Il criterio «`node scripts/analista-cancello.js specs/006-registro-leggibile` esce 0»
+non è verificabile alla lettera nello stato attuale del repo: da quando è stata scritta
+la issue, altri task di quella spec (T002a–T005) sono stati fusi ma le loro caselle in
+`tasks.md` non sono mai state spuntate, quindi restano rilevati come task da lavorare
+che toccano file di test già esistenti — un problema di `tasks.md` non aggiornato,
+indipendente dal difetto di questa issue e fuori dai file da toccare elencati (che non
+includono `specs/006-registro-leggibile/tasks.md`, protetto comunque da
+`percorsi_protetti`). Il difetto specifico descritto nella issue (T001 fuso, casella
+`[x]`) è verificato: senza la correzione produce `task-su-percorso-protetto` su T001,
+con la correzione no — confermato sia sul cancello reale sia da un test isolato nuovo
+che non dipende dallo stato mutevole di `specs/006-*`.
 
 ## Fatto in più
 
-Nulla: solo i due file indicati dalla issue, più il nuovo file di test.
+Nulla: solo i tre file indicati dalla issue (i due file del cancello, identici tra loro,
+e il nuovo file di test).

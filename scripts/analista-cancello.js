@@ -37,7 +37,7 @@ const PERCORSO_WORKFLOW = ".github/workflows/";
 const LABEL_TEST = "allow-test-changes";
 
 const REQ_RE = /^\s*-\s*\*\*(REQ-\d{3})\*\*/;
-const TASK_RE = /^\s*-\s*\[[ xX]\]\s*(T\d{3}[a-z]?)\b/;
+const TASK_RE = /^\s*-\s*\[([ xX])\]\s*(T\d{3}[a-z]?)\b/;
 const TITOLO_RE = /^(#{1,6})\s+(.*)$/;
 const VERIFICA_RE = /verifica\s*:?\s*\*?\s*\S/i;
 const CATENA_REQ_RE = /REQ-(\d{3})((?:\s*(?:\([^)]*\))?\s*,\s*\d{3})*)/g;
@@ -142,7 +142,8 @@ function percorsiCitati(testo) {
 }
 
 // Un task è "- [ ] TNNN ...": la riga più quelle rientrate che la seguono. È manuale se
-// lo dice con [MANUALE] o se sta sotto una fase dichiarata a cura di Alessio.
+// lo dice con [MANUALE] o se sta sotto una fase dichiarata a cura di Alessio. È fatto se
+// la sua casella è già spuntata, "- [x]": non riceverà mai più una PR (REQ-321, REQ-324).
 function estraiTask(testoTasks) {
   const elenco = [];
   let corrente = null;
@@ -156,7 +157,7 @@ function estraiTask(testoTasks) {
     }
     const inizio = TASK_RE.exec(riga);
     if (inizio) {
-      corrente = { id: inizio[1], riga: indice + 1, titolo, blocco: [riga] };
+      corrente = { id: inizio[2], fatto: /[xX]/.test(inizio[1]), riga: indice + 1, titolo, blocco: [riga] };
       elenco.push(corrente);
       return;
     }
@@ -179,6 +180,7 @@ function estraiTask(testoTasks) {
       id: task.id,
       riga: task.riga,
       manuale,
+      fatto: task.fatto,
       requisiti: requisitiCitati(testo),
       percorsi: percorsiCitati(testo),
       haVerifica: VERIFICA_RE.test(testo),
@@ -348,7 +350,10 @@ function verifica({ documenti = {}, configurazione = {}, fileEsistenti = [] } = 
       }
     }
     for (const percorso of voce.percorsi) {
-      if (percorso.startsWith(PERCORSO_WORKFLOW)) {
+      // Un task fatto ha già la sua PR fusa: quella futura che questi due controlli
+      // predicono non esisterà mai più, e segnalarla sarebbe un rilievo permanente e
+      // falso a ogni fusione (REQ-321, REQ-324).
+      if (!voce.fatto && percorso.startsWith(PERCORSO_WORKFLOW)) {
         aggiungi(
           "task-su-workflow",
           "tasks.md",
@@ -361,7 +366,7 @@ function verifica({ documenti = {}, configurazione = {}, fileEsistenti = [] } = 
       const protetto = (configurazione.percorsi_protetti || []).find((modello) =>
         combacia(percorso, modello)
       );
-      if (protetto && esistenti.has(percorso) && !voce.dichiaraLabelTest) {
+      if (!voce.fatto && protetto && esistenti.has(percorso) && !voce.dichiaraLabelTest) {
         aggiungi(
           "task-su-percorso-protetto",
           "tasks.md",
