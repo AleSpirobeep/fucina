@@ -612,6 +612,14 @@ export function agentiAttivi(runs) {
     }));
 }
 
+// specs/006-registro-leggibile/spec.md — REQ-520: la sezione «Agenti attivi» compare solo
+// quando almeno un repo configurato ha almeno un'esecuzione in corso o in coda. Il
+// conteggio nella riga di stato (rigaStato/testoAgentiAlLavoro) resta invece sempre
+// presente, qualunque sia il risultato di questa funzione.
+export function sezioneAgentiAttiviVisibile(repos, statoAgentiAttiviRepo) {
+  return (repos || []).some((repo) => (statoAgentiAttiviRepo[repo]?.dati || []).length > 0);
+}
+
 const MS_AL_MINUTO = 60 * 1000;
 const MINUTI_ALL_ORA = 60;
 
