@@ -554,6 +554,91 @@ export function contrasto(a, b) {
   return (chiara + 0.05) / (scura + 0.05);
 }
 
+// Una voce di stato-sezione (creaStatoSezione/aggiornaStatoRepo) è affidabile
+// solo con dati presenti e freschi: `nonAggiornato` copre sia il primo giro
+// mai riuscito (`dati` assente) sia un giro riuscito seguito da un errore
+// (`dati` della chiamata precedente, tenuti solo per non far sparire la
+// sezione — REQ-122 spec 002, non emendato dalla 006).
+function voceAffidabile(voce) {
+  return !!voce && voce.dati !== undefined && !voce.nonAggiornato;
+}
+
+function testoAgentiAlLavoro(n) {
+  if (n === 0) return "nessun agente al lavoro";
+  return n === 1 ? "1 agente al lavoro" : `${n} agenti al lavoro`;
+}
+
+function testoInAttesaRigaStato(n) {
+  if (n === 0) return "niente in attesa";
+  return n === 1 ? "1 cosa in attesa" : `${n} cose in attesa`;
+}
+
+function testoStatoPmAggregato(pmAcceso, pmSpento, pmNonInstallato) {
+  const parti = [];
+  if (pmAcceso > 0) parti.push(pmAcceso === 1 ? "1 acceso" : `${pmAcceso} accesi`);
+  if (pmSpento > 0) parti.push(pmSpento === 1 ? "1 spento" : `${pmSpento} spenti`);
+  if (pmNonInstallato > 0) {
+    parti.push(pmNonInstallato === 1 ? "1 non installato" : `${pmNonInstallato} non installati`);
+  }
+  return `PM: ${parti.join(", ")}`;
+}
+
+// REQ-501, 502, 503 (spec 006): la riga di stato sopra le sezioni, composta
+// dai soli dati che la pagina ha già caricato (nessuna chiamata nuova). Un
+// repo con anche una sola voce non affidabile (mai caricata, o non
+// aggiornata dopo un errore) non entra nella somma: l'incompletezza si
+// dichiara, non si copre sommando dati parziali.
+export function rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo) {
+  const listaRepo = repos || [];
+  if (listaRepo.length === 0) {
+    return { configurato: false };
+  }
+
+  let repoCompleti = 0;
+  let repoIncompleti = 0;
+  let pmAcceso = 0;
+  let pmSpento = 0;
+  let pmNonInstallato = 0;
+  let statoPmUnico = null;
+  let agentiAlLavoro = 0;
+  let inAttesa = 0;
+
+  for (const repo of listaRepo) {
+    const pmVoce = statoPmRepo[repo];
+    const agentiVoce = statoAgentiAttiviRepo[repo];
+    const avanzamentoVoce = statoAvanzamentoRepo[repo];
+
+    if (!voceAffidabile(pmVoce) || !voceAffidabile(agentiVoce) || !voceAffidabile(avanzamentoVoce)) {
+      repoIncompleti++;
+      continue;
+    }
+
+    repoCompleti++;
+    statoPmUnico = pmVoce.dati.stato;
+    if (statoPmUnico === "acceso") pmAcceso++;
+    else if (statoPmUnico === "spento") pmSpento++;
+    else pmNonInstallato++;
+
+    agentiAlLavoro += agentiVoce.dati.length;
+    inAttesa += avanzamentoVoce.dati.lavoro.totale;
+  }
+
+  if (repoIncompleti > 0) {
+    const testo =
+      repoCompleti === 0
+        ? "Dati incompleti: nessuna informazione disponibile al momento."
+        : `Dati incompleti: ${repoIncompleti} repo su ${listaRepo.length} ${
+            repoIncompleti === 1 ? "non risponde" : "non rispondono"
+          }.`;
+    return { configurato: true, completo: false, testo };
+  }
+
+  const pmTesto = repoCompleti === 1 ? testoStatoPm(statoPmUnico) : testoStatoPmAggregato(pmAcceso, pmSpento, pmNonInstallato);
+  const testo = `${pmTesto} · ${testoAgentiAlLavoro(agentiAlLavoro)} · ${testoInAttesaRigaStato(inAttesa)}`;
+
+  return { configurato: true, completo: true, testo };
+}
+
 // Le quattordici coppie di REQ-541, in entrambi i temi (palette.md).
 export const COPPIE_CONTRASTO = [
   { etichetta: "testo su sfondo", a: "--colore-testo", b: "--colore-sfondo" },

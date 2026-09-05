@@ -307,6 +307,7 @@
       <button id="aggiornaOra">Aggiorna</button>
       <p id="ultimoAggiornamento"></p>
       <div id="banner" role="alert" hidden></div>
+      <div id="rigaStato"></div>
 
       <section id="aspettanoTe">
         <h2>Aspettano te</h2>
@@ -354,6 +355,7 @@
         messaggioConfermaAvvia,
         lavoroInAttesa,
         avvisoPmSpento,
+        rigaStato,
       } from "./lib.js";
       import {
         issueAperte,
@@ -385,6 +387,7 @@
       const pulsanteAggiorna = document.getElementById("aggiornaOra");
       const etichettaUltimoAggiornamento = document.getElementById("ultimoAggiornamento");
       const banner = document.getElementById("banner");
+      const rigaStatoEl = document.getElementById("rigaStato");
 
       const INTERVALLO_AGGIORNAMENTO_MS = 60 * 1000;
 
@@ -983,6 +986,32 @@
         }
       }
 
+      // REQ-501/502/503: la riga si aggiorna a fine ciclo, quando i tre stati
+      // che legge riflettono già l'esito (riuscito o no) del giro appena
+      // fatto — mai prima, altrimenti un ciclo ancora da iniziare sembra un
+      // guasto (i tre stati sarebbero vuoti, non falliti).
+      function renderRigaStato(repos) {
+        const riga = rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo);
+        rigaStatoEl.innerHTML = "";
+
+        if (!riga.configurato) {
+          const messaggio = document.createElement("p");
+          messaggio.textContent = "Nessun repo configurato.";
+          const pulsante = document.createElement("button");
+          pulsante.type = "button";
+          pulsante.textContent = "Configurazione";
+          pulsante.addEventListener("click", mostraConfigurazione);
+          rigaStatoEl.appendChild(messaggio);
+          rigaStatoEl.appendChild(pulsante);
+          return;
+        }
+
+        const p = document.createElement("p");
+        if (!riga.completo) p.setAttribute("role", "alert");
+        p.textContent = riga.testo;
+        rigaStatoEl.appendChild(p);
+      }
+
       async function aggiorna() {
         const nuovoStato = avviaAggiornamento(statoAggiornamento);
         if (!nuovoStato) return;
@@ -990,6 +1019,8 @@
         pulsanteAggiorna.disabled = true;
 
         await Promise.all([caricaAspettanoTe(), caricaAvanzamento(), caricaAgentiAttivi(), caricaPm()]);
+
+        renderRigaStato(parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || ""));
 
         const haErrori =
           Object.values(statoAspettanoTe).some((voce) => voce.errore) ||
