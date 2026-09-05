@@ -249,6 +249,26 @@
         cursor: pointer;
       }
 
+      .dettaglio-conteggio {
+        list-style: none;
+        margin: 0.4rem 0 0;
+        padding: 0.4rem 0.6rem;
+        max-width: 22rem;
+        max-height: 12rem;
+        overflow-y: auto;
+        background: var(--colore-sfondo);
+        border: 1px solid var(--colore-bordo);
+        border-radius: 0.3rem;
+      }
+
+      .dettaglio-conteggio li {
+        padding: 0.3rem 0;
+      }
+
+      .dettaglio-conteggio li + li {
+        border-top: 1px solid var(--colore-bordo);
+      }
+
       label {
         font-family: var(--font-titoli);
         font-size: 0.9rem;
@@ -327,6 +347,12 @@
         classifica,
         vociAvanzamento,
         testoConteggioAvanzamento,
+        tabellaAvanzamento,
+        idDettaglioAvanzamento,
+        dettagliApertiDaTesto,
+        testoDettagliAperti,
+        alternaDettaglioAperto,
+        dettagliApertiValidi,
         agentiAttivi,
         formattaTempoTrascorso,
         ultimoCommento,
@@ -371,6 +397,7 @@
 
       const CHIAVE_TOKEN = "fucina.token";
       const CHIAVE_REPO = "fucina.repoTesto";
+      const CHIAVE_DETTAGLI_APERTI = "fucina.dettagliAperti";
 
       const sezioneConfigurazione = document.getElementById("configurazione");
       const sezioneDashboard = document.getElementById("dashboard");
@@ -395,9 +422,28 @@
       let statoPmRepo = creaStatoSezione();
       let statoEsecuzioniFermaPm = {};
       let statoEsitoAvvioPm = {};
+      let dettagliAperti = leggiDettagliAperti();
 
       function tokenSalvato() {
         return localStorage.getItem(CHIAVE_TOKEN) || "";
+      }
+
+      // REQ-512: una finestra privata può rifiutare la lettura o la scrittura. In quel
+      // caso la pagina funziona comunque, parte compatta e non lo mostra come un errore.
+      function leggiDettagliAperti() {
+        try {
+          return dettagliApertiDaTesto(localStorage.getItem(CHIAVE_DETTAGLI_APERTI));
+        } catch {
+          return [];
+        }
+      }
+
+      function salvaDettagliAperti(aperti) {
+        try {
+          localStorage.setItem(CHIAVE_DETTAGLI_APERTI, testoDettagliAperti(aperti));
+        } catch {
+          // memoria non concessa: si ignora, la pagina resta compatta.
+        }
       }
 
       function aggiungiMessaggioErrore(sezione, messaggio) {
@@ -464,11 +510,17 @@
       // REQ-510, 513: sette conteggi in riga, senza titoli. Un conteggio apribile è un
       // <details> — l'indicatore d'apertura e la reazione al clic sono quelli nativi del
       // browser; un conteggio a zero resta un testo semplice, che non ha né l'uno né
-      // l'altro. Il contenuto del <details> arriva con T004.
-      function costruisciConteggiAvanzamento(repo, classificazione, inCoda) {
+      // l'altro.
+      // REQ-511, 512: aperto mostra i titoli con il link a GitHub, e lo stato aperto/chiuso
+      // è quello ricordato nel browser; ogni cambio lo aggiorna subito.
+      function costruisciConteggiAvanzamento(repo, classificazione, inCoda, issueInCoda) {
         const sezione = costruisciSezioneRepo(repo);
         const elenco = document.createElement("ul");
         elenco.className = "conteggi-avanzamento";
+
+        const elementiPerChiave = new Map(
+          tabellaAvanzamento(classificazione, issueInCoda).map((c) => [c.chiave, c.elementi]),
+        );
 
         for (const voce of vociAvanzamento(classificazione, inCoda)) {
           const li = document.createElement("li");
@@ -477,6 +529,39 @@
             const sommario = document.createElement("summary");
             sommario.textContent = testoConteggioAvanzamento(voce);
             dettaglio.appendChild(sommario);
+
+            const elencoTitoli = document.createElement("ul");
+            elencoTitoli.className = "dettaglio-conteggio";
+            for (const elemento of elementiPerChiave.get(voce.chiave) || []) {
+              const voceTitolo = document.createElement("li");
+              const link = document.createElement("a");
+              link.href = elemento.url;
+              link.target = "_blank";
+              link.rel = "noopener";
+              link.textContent = elemento.titolo;
+              voceTitolo.appendChild(link);
+              elencoTitoli.appendChild(voceTitolo);
+            }
+            dettaglio.appendChild(elencoTitoli);
+
+            // Impostare `open` a true, qui, aggiunge l'attributo e questo — da specifica —
+            // accoda comunque un evento "toggle" nativo, anche senza alcun clic: senza
+            // questa guardia quell'eco cancellerebbe subito la memoria appena ripristinata.
+            // Impostarlo a false, quando era già assente, non muta l'attributo e non ne
+            // accoda uno: i conteggi che partono chiusi non hanno bisogno della guardia.
+            const id = idDettaglioAvanzamento(repo, voce.chiave);
+            const ripristinatoAperto = dettagliAperti.includes(id);
+            let ignoraProssimoToggle = ripristinatoAperto;
+            dettaglio.open = ripristinatoAperto;
+            dettaglio.addEventListener("toggle", () => {
+              if (ignoraProssimoToggle) {
+                ignoraProssimoToggle = false;
+                return;
+              }
+              dettagliAperti = alternaDettaglioAperto(dettagliAperti, id);
+              salvaDettagliAperti(dettagliAperti);
+            });
+
             li.appendChild(dettaglio);
           } else {
             const span = document.createElement("span");
@@ -670,10 +755,24 @@
           if (!voce) continue;
 
           if (voce.dati) {
+            // REQ-512, caso limite: un dettaglio ricordato che punta a un conteggio
+            // tornato a zero si dimentica. Solo i conteggi di questo repo, di cui
+            // conosciamo lo stato attuale: quelli di un repo non ancora caricato restano
+            // come sono finché non si sa se sono ancora validi.
+            const idApribiliRepo = vociAvanzamento(voce.dati.classificazione, voce.dati.inCoda)
+              .filter((v) => v.apribile)
+              .map((v) => idDettaglioAvanzamento(repo, v.chiave));
+            const dettagliApertiPotati = dettagliApertiValidi(dettagliAperti, repo, idApribiliRepo);
+            if (dettagliApertiPotati.length !== dettagliAperti.length) {
+              dettagliAperti = dettagliApertiPotati;
+              salvaDettagliAperti(dettagliAperti);
+            }
+
             const sezione = costruisciConteggiAvanzamento(
               repo,
               voce.dati.classificazione,
               voce.dati.inCoda,
+              voce.dati.lavoro.inCoda,
             );
             const rigaPmEl = costruisciRigaPm(
               voce.dati.inCoda,
@@ -1090,6 +1189,8 @@
 
       document.getElementById("dimenticaToken").addEventListener("click", () => {
         localStorage.removeItem(CHIAVE_TOKEN);
+        localStorage.removeItem(CHIAVE_DETTAGLI_APERTI);
+        dettagliAperti = [];
         mostraConfigurazione();
       });
 

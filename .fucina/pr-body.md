@@ -1,28 +1,70 @@
-Implementa T003 della spec `006-registro-leggibile`: l'avanzamento come riga di sette conteggi (spec.md REQ-510, 513; tasks.md T003).
-
 ## Cosa ho fatto
 
-- In `ui/lib.js`, `vociAvanzamento(classificazione, inCoda)`: pura, senza rete. Riusa `tabellaAvanzamento` per le sei colonne esistenti, tenendo solo `chiave`, `etichetta` e `conteggio` (nessun titolo), e aggiunge una settima voce `inCoda` col conteggio passato come parametro (calcolato altrove da `contaInCoda`, nessuna chiamata nuova). Ogni voce porta `apribile: conteggio > 0`.
-- `testoConteggioAvanzamento(voce)`: compone `"Etichetta numero"` (es. `"Fatte 7"`, `"Backlog 0"`), il formato usato dagli scenari della spec.
-- In `ui/index.html`, `costruisciConteggiAvanzamento` sostituisce `costruisciTabellaRepo`: rende una `<ul class="conteggi-avanzamento">` di sette voci. Una voce apribile è un `<details><summary>` — l'indicatore d'apertura e la reazione al clic sono quelli nativi del browser, senza JavaScript su misura; una voce a zero è un `<span>` semplice, che non ha né l'uno né l'altro (REQ-513). Il contenuto del `<details>` resta vuoto: i titoli con link sono il dettaglio di T004, fuori dal perimetro di questa issue.
-- Tolto il paragrafo del conteggio in-coda da `costruisciRigaPm`: la riga del PM torna a mostrare solo stato, ultima esecuzione e comando. La funzione pura `rigaPm()` continua a calcolare `testoInCoda` (il suo test in `ui/riga-pm.test.js` è un percorso protetto e non l'ho toccato) ma quel valore non viene più letto per il rendering: il numero dei task in coda compare una volta sola nella pagina, nella riga dei sette conteggi.
-- Rimossi gli stili `table`/`th`/`td` non più usati da nessun altro punto della pagina (l'unico impiego era la tabella che ho sostituito), aggiunto lo stile per `.conteggi-avanzamento`.
-- Test nuovi in `ui/conteggi-avanzamento.test.js`: le sette chiavi ed etichette nell'ordine giusto; sette issue chiuse di recente e tre in coda → sette conteggi, nessuna voce porta `elementi` o `titolo`; il conteggio in-coda arriva dal parametro e non dalla classificazione; ogni voce a zero ha `apribile: false`; una voce con conteggio maggiore di zero ha `apribile: true`; nessuna chiamata `fetch`; `testoConteggioAvanzamento` compone etichetta e numero.
+Il dettaglio che si apre, e che viene ricordato — T004 della spec 006.
+
+- `ui/lib.js`:
+  - `tabellaAvanzamento(classificazione, issueInCoda)`: il secondo parametro è opzionale,
+    retrocompatibile con l'unico uso esistente (`vociAvanzamento`) e con il test protetto
+    `ui/avanzamento.test.js`. Passandolo, aggiunge la settima colonna «In coda» con titolo
+    e url di ogni issue, sullo stesso modello delle altre sei — è il dato che mancava per
+    mostrare il dettaglio di quel conteggio, dato che `vociAvanzamento` non porta titoli
+    per contratto (il test `ui/conteggi-avanzamento.test.js` lo verifica esplicitamente).
+  - `idDettaglioAvanzamento`, `dettagliApertiDaTesto`, `testoDettagliAperti`,
+    `alternaDettaglioAperto`, `dettagliApertiValidi`: le funzioni pure della memoria dei
+    dettagli aperti — costruzione dell'id, (de)serializzazione JSON tollerante a memoria
+    assente o malformata, apertura/chiusura, e l'oblio di un id che punta a un conteggio
+    tornato a zero.
+- `ui/index.html`:
+  - ogni conteggio apribile è ora un `<details>` con dentro un `<ul class="dettaglio-conteggio">`
+    di link a GitHub (titolo + url), scrollabile nel proprio riquadro (`max-height` +
+    `overflow-y: auto`) invece di allungare la pagina.
+  - lo stato aperto/chiuso si legge e si scrive nella chiave `fucina.dettagliAperti`, con lo
+    stesso prefisso di `fucina.token` e `fucina.repoTesto`; lettura e scrittura sono avvolte
+    in try/catch, così una finestra privata che rifiuta la memoria non produce errori e la
+    pagina parte compatta.
+  - a ogni giro di `caricaAvanzamento`, i dettagli ricordati del repo appena caricato che non
+    sono più fra i conteggi apribili vengono dimenticati (non solo mostrati chiusi); i
+    dettagli di repo non ancora caricati in questo giro non vengono toccati, perché non si sa
+    ancora se sono validi.
+  - «Dimentica il token» ora azzera anche questa memoria.
+  - un dettaglio da tenere presente: impostare `details.open = true` per ripristinare uno
+    stato ricordato *aggiunge* l'attributo `open`, e questo — per specifica HTML — accoda
+    comunque un evento `toggle` nativo, anche senza alcun clic dell'utente. Senza una
+    guardia, quell'eco avrebbe cancellato la memoria appena ripristinata al primo giro di
+    event loop dopo il caricamento. La guardia scatta solo quando il dettaglio parte aperto
+    (l'unico caso che genera una mutazione dell'attributo, quindi l'unico che accoda
+    l'evento): i conteggi che partono chiusi rispondono al primo clic normalmente.
+- Test in `ui/dettaglio-apribile.test.js` (nuovo): 14 casi, su tutte le funzioni pure sopra.
 
 ## Come l'ho verificato
 
-`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 319 test verdi (312 esistenti invariati + 7 nuovi). Nessun file di test esistente toccato.
-
-Closes #92
+- `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 333 test, tutti verdi
+  (280+ preesistenti, invariati, più i 14 nuovi di questo task).
+- `node --check` sul contenuto di `ui/lib.js` e dello script di `ui/index.html`.
+- Il comportamento del `toggle` nativo di `<details>` descritto sopra è stato confermato
+  contro la specifica HTML (l'attributo `open` che cambia accoda sempre un evento,
+  indipendentemente da un clic); non è stato possibile un giro completo in un browser reale
+  con dati GitHub live in questo ambiente (nessun token configurato).
 
 ## Decisioni
 
-Nessun ADR: l'uso di `<details>`/`<summary>` per l'indicatore e la reazione al clic è la lettura più diretta di "una voce a zero non reagisce al clic e non mostra l'indicatore di apertura che hanno le altre" — comportamento nativo del browser, niente da testare con `node:test` oltre al flag `apribile` che lo determina, e niente da costruire in anticipo per T004 (apertura, titoli, memoria), che resta libero di riempire il `<details>` come vuole.
+Nessun ADR nuovo: le scelte di questo task (formato della chiave di memoria, separatore
+dell'id, ambito della potatura per repo) sono dettagli di implementazione già coperti dalla
+Fase 0 del piano («la memoria della vista sta accanto alle altre preferenze del browser, con
+lo stesso prefisso»), senza alternative con conseguenze da confrontare.
+
+Closes #93
 
 ## Non fatto
 
-Nulla: i criteri di accettazione della issue (sette conteggi senza titoli, il numero in-coda una sola volta e fuori dalla riga del PM, una voce a zero non apribile, nessuna richiesta di rete) sono coperti tutti.
+Nulla dei criteri di accettazione della issue: apertura/chiusura con titoli e link,
+persistenza al ricarico, azzeramento con «Dimentica il token», nessun errore in finestra
+privata, oblio del dettaglio a conteggio zero, e scorrimento del riquadro sono tutti
+implementati e coperti da test dove la logica è pura. La verifica visiva in un browser reale
+(schermo 1280×800, finestra privata, molti titoli) resta da fare da chi ha un token e un repo
+di prova, come già per gli altri task di questa fase.
 
 ## Fatto in più
 
-Rimossi gli stili `table`, `th`, `td` e `td ul` dal foglio di stile: diventati inutilizzati nello stesso cambio che toglie l'unica tabella della pagina, lasciarli sarebbe stato CSS morto.
+Nulla: solo i tre file indicati dalla issue (`ui/index.html`, `ui/lib.js`,
+`ui/dettaglio-apribile.test.js`).
