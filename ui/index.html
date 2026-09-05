@@ -360,6 +360,9 @@
         avvisoPmSpento,
         rigaStato,
         messaggioNessunRepoConfigurato,
+        situazioneRigaStato,
+        testoRigaStatoCaricamento,
+        testoRigaStatoIncompleto,
       } from "./lib.js";
       import {
         issueAperte,
@@ -430,8 +433,11 @@
       }
 
       // REQ-501, 502, 503: la riga di stato in cima, prima di «Aspettano te». Chiamata a
-      // fine di ognuno dei tre caricamenti da cui dipende: finché non sono tutti conclusi
-      // con successo per un repo, `rigaStato` lo lascia fuori (T002b se ne occupa).
+      // fine di ognuno dei tre caricamenti da cui dipende. Produce sempre una riga per ogni
+      // repo configurato — mai un vuoto in mezzo agli altri — distinguendo le tre situazioni
+      // di T002b: caricamento, incompleto, riuscito (`situazioneRigaStato`). Solo nel caso
+      // riuscito legge i tre testi da `rigaStato` (T002a), che resta la sola fonte per quel
+      // caso.
       function renderRigaStato() {
         const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
         contenutoRigaStato.innerHTML = "";
@@ -445,9 +451,25 @@
           return;
         }
 
-        for (const riga of stato.righe) {
+        const righePerRepo = new Map(stato.righe.map((riga) => [riga.repo, riga]));
+
+        for (const repo of repos) {
+          const situazione = situazioneRigaStato(
+            statoPmRepo[repo],
+            statoAgentiAttiviRepo[repo],
+            statoAvanzamentoRepo[repo],
+          );
+
           const p = document.createElement("p");
-          p.textContent = `${riga.repo}: ${riga.testoStato} · ${riga.testoAgenti} · ${riga.testoLavoro}`;
+          if (situazione === "caricamento") {
+            p.textContent = testoRigaStatoCaricamento(repo);
+          } else if (situazione === "incompleto") {
+            p.setAttribute("role", "alert");
+            p.textContent = testoRigaStatoIncompleto(repo);
+          } else {
+            const riga = righePerRepo.get(repo);
+            p.textContent = `${riga.repo}: ${riga.testoStato} · ${riga.testoAgenti} · ${riga.testoLavoro}`;
+          }
           contenutoRigaStato.appendChild(p);
         }
       }

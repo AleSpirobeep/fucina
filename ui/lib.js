@@ -494,6 +494,29 @@ export function rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanza
   return { configurato: true, righe };
 }
 
+// REQ-501, 502 — T002b: le tre situazioni in cui può trovarsi un repo, nominate per non
+// ricadere nell'errore delle tre revisioni precedenti di T002 (#91), che le confondevano.
+// "caricamento" finché anche una sola delle tre fonti non ha mai completato un giro (voce
+// undefined, mai scritta da aggiornaStatoRepo); "incompleto" se una fonte ha fallito il
+// proprio giro più recente (nonAggiornato), anche quando porta ancora dati di un giro
+// riuscito in precedenza — REQ-122 (spec 002) vuole quei dati in memoria, ma mai letti come
+// freschi; "riuscito" solo quando tutte e tre sono fresche. Nessuna chiamata di rete.
+export function situazioneRigaStato(pmVoce, agentiVoce, avanzamentoVoce) {
+  const voci = [pmVoce, agentiVoce, avanzamentoVoce];
+  if (voci.some((voce) => voce === undefined)) return "caricamento";
+  if (voci.some((voce) => voce.nonAggiornato)) return "incompleto";
+  return "riuscito";
+}
+
+export function testoRigaStatoCaricamento(repo) {
+  return `${repo}: caricamento in corso…`;
+}
+
+// La sintesi non ripete il testo integrale dell'errore: sta già nel banner e in Avanzamento.
+export function testoRigaStatoIncompleto(repo) {
+  return `${repo}: dati incompleti, alcune fonti non aggiornate`;
+}
+
 export function tabellaAvanzamento(classificazione) {
   return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
     const elementi = (classificazione[chiave] || []).map((elemento) => ({
