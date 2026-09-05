@@ -518,14 +518,27 @@ export function testoRigaStatoIncompleto(repo) {
   return `${repo}: dati incompleti, un aggiornamento non è riuscito`;
 }
 
-export function tabellaAvanzamento(classificazione) {
-  return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
+// Il secondo parametro è opzionale: senza, si comporta come prima (le sei colonne). Con gli
+// issue in-coda passati, aggiunge la settima colonna con gli stessi titolo/url delle altre —
+// è ciò che T004 usa per mostrare il dettaglio di «In coda», che vociAvanzamento non porta.
+export function tabellaAvanzamento(classificazione, issueInCoda) {
+  const colonne = COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
     const elementi = (classificazione[chiave] || []).map((elemento) => ({
       titolo: elemento.title,
       url: elemento.html_url,
     }));
     return { chiave, etichetta, conteggio: elementi.length, elementi };
   });
+
+  if (issueInCoda) {
+    const elementi = issueInCoda.map((elemento) => ({
+      titolo: elemento.title,
+      url: elemento.html_url,
+    }));
+    colonne.push({ chiave: "inCoda", etichetta: "In coda", conteggio: elementi.length, elementi });
+  }
+
+  return colonne;
 }
 
 // specs/006-registro-leggibile/spec.md — REQ-510, 513: l'avanzamento come riga di sette
@@ -546,6 +559,45 @@ export function vociAvanzamento(classificazione, inCoda) {
 
 export function testoConteggioAvanzamento(voce) {
   return `${voce.etichetta} ${voce.conteggio}`;
+}
+
+// specs/006-registro-leggibile/spec.md — REQ-511, 512: la memoria di quali conteggi
+// dell'avanzamento sono aperti. Vive accanto alle altre preferenze del browser (repo,
+// token) con lo stesso prefisso "fucina.", così che "Dimentica il token" la azzeri con la
+// stessa regola invece di doverne aggiungere una seconda. "#" non compare mai in un nome di
+// repo owner/nome né in una chiave di colonna, quindi separa senza ambiguità.
+export function idDettaglioAvanzamento(repo, chiave) {
+  return `${repo}#${chiave}`;
+}
+
+// Nessuna memoria concessa (JSON assente o non valido) equivale a "tutto chiuso": è lo
+// stato compatto di un browser che apre la pagina la prima volta, e anche quello di una
+// finestra privata che rifiuta la scrittura.
+export function dettagliApertiDaTesto(testo) {
+  if (!testo) return [];
+  try {
+    const valori = JSON.parse(testo);
+    return Array.isArray(valori) ? valori.filter((v) => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function testoDettagliAperti(aperti) {
+  return JSON.stringify(aperti);
+}
+
+export function alternaDettaglioAperto(aperti, id) {
+  return aperti.includes(id) ? aperti.filter((v) => v !== id) : [...aperti, id];
+}
+
+// Un id ricordato può puntare a un conteggio che nel frattempo è tornato a zero: si
+// presenta chiuso e va dimenticato (REQ-512, caso limite della spec 006). Gli id degli
+// altri repo restano intatti — questa funzione giudica solo quelli del repo indicato,
+// perché è l'unico di cui il chiamante conosce lo stato attuale in quel momento.
+export function dettagliApertiValidi(aperti, repo, idApribiliDelRepo) {
+  const validi = new Set(idApribiliDelRepo);
+  return aperti.filter((id) => !id.startsWith(`${repo}#`) || validi.has(id));
 }
 
 const STATI_RUN_ATTIVI = new Set(["in_progress", "queued"]);
