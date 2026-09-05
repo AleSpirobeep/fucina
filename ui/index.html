@@ -308,6 +308,10 @@
       <p id="ultimoAggiornamento"></p>
       <div id="banner" role="alert" hidden></div>
 
+      <section id="rigaStato">
+        <div id="contenutoRigaStato"></div>
+      </section>
+
       <section id="aspettanoTe">
         <h2>Aspettano te</h2>
         <div id="elencoAspettanoTe"></div>
@@ -354,6 +358,8 @@
         messaggioConfermaAvvia,
         lavoroInAttesa,
         avvisoPmSpento,
+        rigaStato,
+        messaggioNessunRepoConfigurato,
       } from "./lib.js";
       import {
         issueAperte,
@@ -379,6 +385,7 @@
       const campoRepo = document.getElementById("repoTesto");
       const campoToken = document.getElementById("token");
       const erroreConfigurazione = document.getElementById("erroreConfigurazione");
+      const contenutoRigaStato = document.getElementById("contenutoRigaStato");
       const tabelleAvanzamento = document.getElementById("tabelleAvanzamento");
       const elencoAgentiAttivi = document.getElementById("elencoAgentiAttivi");
       const elencoAspettanoTe = document.getElementById("elencoAspettanoTe");
@@ -420,6 +427,29 @@
         titolo.textContent = repo;
         sezione.appendChild(titolo);
         return sezione;
+      }
+
+      // REQ-501, 502, 503: la riga di stato in cima, prima di «Aspettano te». Chiamata a
+      // fine di ognuno dei tre caricamenti da cui dipende: finché non sono tutti conclusi
+      // con successo per un repo, `rigaStato` lo lascia fuori (T002b se ne occupa).
+      function renderRigaStato() {
+        const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
+        contenutoRigaStato.innerHTML = "";
+
+        const stato = rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo);
+
+        if (!stato.configurato) {
+          const p = document.createElement("p");
+          p.textContent = messaggioNessunRepoConfigurato();
+          contenutoRigaStato.appendChild(p);
+          return;
+        }
+
+        for (const riga of stato.righe) {
+          const p = document.createElement("p");
+          p.textContent = `${riga.repo}: ${riga.testoStato} · ${riga.testoAgenti} · ${riga.testoLavoro}`;
+          contenutoRigaStato.appendChild(p);
+        }
       }
 
       function costruisciTabellaRepo(repo, classificazione) {
@@ -698,6 +728,7 @@
         }
 
         renderAvanzamento(repos);
+        renderRigaStato();
       }
 
       // REQ-401, 402: solo due letture per repo (L1, e L2 se installato) — il
@@ -724,6 +755,7 @@
         }
 
         renderAvanzamento(repos);
+        renderRigaStato();
       }
 
       function costruisciSezioneAgentiAttivi(repo, agenti) {
@@ -793,6 +825,7 @@
         }
 
         renderAgentiAttivi(repos);
+        renderRigaStato();
       }
 
       function costruisciFormRispondiERiavvia(issue, repo) {
