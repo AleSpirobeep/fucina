@@ -1,25 +1,26 @@
-Implementa T002a della spec `006-registro-leggibile`: la riga di stato sopra ogni sezione, per il solo caso in cui il caricamento è riuscito. I tre stati (non ancora caricato, un repo non risponde, tutto a posto) sono T002b — questa issue nasce dalla divisione di T002 (#91) proprio per tenerli separati.
+Implementa T002b della spec `006-registro-leggibile`: i tre stati della riga di stato (spec.md REQ-501, 502; tasks.md T002b), divisa da T002 (#91) dopo tre tentativi esauriti (PR #99, #100, #101) e già ritentata due volte (PR chiusa per fallimento del check `guard`; seconda PR chiusa perché il corpo mancava delle sezioni "Non fatto" e "Fatto in più").
 
 ## Cosa ho fatto
 
-- In `ui/lib.js`, `rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo)`: per ogni repo compone stato del PM, agenti al lavoro e lavoro in attesa (totale) dai dati che la pagina ha già caricato — nessuna chiamata nuova. Include un repo solo se tutte e tre le voci hanno concluso con successo il proprio giro; un repo il cui giro non è ancora completo resta fuori dalle righe (comportamento provvisorio: la distinzione esplicita fra "in caricamento" ed "errore" è T002b). Senza repo configurati restituisce `{ configurato: false }`. Due funzioni di testo di supporto, `testoAgentiAlLavoro(numero)` e `testoLavoroInAttesa(numero)`, dicono esplicitamente "nessun agente al lavoro" e "niente in attesa" quando il conteggio è zero, così un repo del tutto a riposo non resta muto. `messaggioNessunRepoConfigurato()` rimanda alla configurazione invece di mostrare tre zeri.
-- In `ui/index.html`, la sezione `#rigaStato` in cima alla dashboard, prima di «Aspettano te» (ordine nel documento: riga di stato, «Aspettano te», «Avanzamento», «Agenti attivi», verificato con REQ-503). `renderRigaStato()` viene richiamata a fine di ciascuno dei tre caricamenti da cui dipende — `caricaAvanzamento`, `caricaPm`, `caricaAgentiAttivi` — così la riga si aggiorna via via che i dati arrivano, senza attendere che tutti i repo abbiano finito.
-- Test nuovi in `ui/riga-stato.test.js`: nessun repo configurato, repo configurato ma dati non ancora arrivati, repo del tutto a riposo (testo esplicito su tutti e tre i fronti), repo con agenti e lavoro in attesa (pluralizzazione inclusa), due repo di cui uno solo caricato, nessuna chiamata `fetch`.
+- In `ui/lib.js`, `situazioneRigaStato(pmVoce, agentiVoce, avanzamentoVoce)`: pura, senza rete. Dice se un repo è in `"caricamento"` (almeno una delle tre fonti — PM, agenti attivi, avanzamento — non ha mai completato un giro, voce `undefined`), `"incompleto"` (una fonte ha fallito il proprio giro più recente, `nonAggiornato`, anche se porta ancora i dati di un giro riuscito in precedenza — REQ-122 spec 002 li tiene in memoria ma non li lascia mai leggere come freschi) o `"riuscito"` (tutte e tre fresche).
+- `testoRigaStatoCaricamento(repo)` e `testoRigaStatoIncompleto(repo)`: la seconda nomina solo il repo, senza ripetere il testo integrale dell'errore (già nel banner e in Avanzamento).
+- In `ui/index.html`, `renderRigaStato()` ora produce sempre una riga per ogni repo configurato — mai un vuoto in mezzo agli altri: calcola la situazione con `situazioneRigaStato` e sceglie il testo di conseguenza. Per "riuscito" continua a leggere i tre testi da `rigaStato` (T002a, non toccata). Per "incompleto" imposta `role="alert"` (il colore d'errore in pagina è legato solo a quello, nessuna classe nuova); per "caricamento" non lo imposta, tono neutro.
+- Test nuovi in `ui/stati-riga-stato.test.js`: nessuna fonte completata, una sola fonte mancante, tutte e tre riuscite, una fonte che fallisce al primo giro (incompleto, non caricamento), una fonte che smette di rispondere dopo un giro riuscito (costruita con `aggiornaStatoRepo` reale, verificando che il dato vecchio resti in memoria ma non sia mai letto come `"riuscito"`), i due testi (quello di incompletezza verificato per non contenere il testo integrale di un errore d'esempio), nessuna chiamata `fetch`.
 
 ## Come l'ho verificato
 
-`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 304 test verdi (292 esistenti invariati + 12 nuovi).
+`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 312 test verdi (303 esistenti invariati + 9 nuovi). Nessun file di test esistente toccato.
 
-Closes #103
+Closes #104
 
 ## Decisioni
 
-Nessun ADR: l'unica scelta non scritta esplicitamente nella issue è cosa fare di un repo il cui giro non è ancora concluso (ometterlo dalle righe finché non lo è). Non è una scelta discrezionale che introduce comportamento visibile nuovo: la issue stessa dichiara che gli stati di caricamento ed errore sono T002b, quindi qualunque resa provvisoria di quel caso è dentro il perimetro che T002b sostituirà.
+Nessun ADR: i tre stati sono a livello di intero repo (non per singola fonte dentro lo stesso repo), come impongono i criteri di accettazione della issue e il caso limite della spec 006 ("un repo risponde e un altro no"), sempre riferiti a un repo nel suo complesso — è la lezione delle tre revisioni precedenti di T002 (#91), che mescolavano gli stati senza nominarli. Riusare `role="alert"` invece di una classe CSS nuova non è discrezionale: è l'unico aggancio già esistente nella pagina per il colore d'errore.
 
 ## Non fatto
 
-La distinzione esplicita fra "non ancora caricato" e "un repo non risponde" — è T002b per dichiarazione esplicita della issue, non un buco di questa PR.
+Nulla: tutti i criteri di accettazione della issue sono coperti.
 
 ## Fatto in più
 
-Nulla oltre ai tre file indicati dalla issue (`ui/lib.js`, `ui/index.html`, `ui/riga-stato.test.js`) più questo corpo della PR.
+Nulla oltre ai tre file indicati dalla issue (`ui/lib.js`, `ui/index.html`, `ui/stati-riga-stato.test.js`) più questo corpo della PR.

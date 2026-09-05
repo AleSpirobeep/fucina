@@ -494,6 +494,30 @@ export function rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanza
   return { configurato: true, righe };
 }
 
+// specs/006-registro-leggibile/spec.md — REQ-501, 502: i tre stati della riga di stato,
+// nominati per non ricadere nell'errore che ha bloccato tre volte T002 (#91): "non ancora
+// caricato" e "un repo non risponde" sono situazioni diverse, non un'unica zona grigia
+// dietro un unico controllo di presenza dati. Una voce `undefined` vuol dire che quella
+// fonte non ha mai completato un giro; una voce con `nonAggiornato` vuol dire che il giro
+// più recente è fallito, anche se porta ancora i dati di un giro precedente riuscito
+// (REQ-122, spec 002) — quei dati restano in memoria ma non sono mai letti come freschi.
+export function situazioneRigaStato(pmVoce, agentiVoce, avanzamentoVoce) {
+  const voci = [pmVoce, agentiVoce, avanzamentoVoce];
+  if (voci.some((voce) => voce === undefined)) return "caricamento";
+  if (voci.some((voce) => voce.nonAggiornato)) return "incompleto";
+  return "riuscito";
+}
+
+export function testoRigaStatoCaricamento(repo) {
+  return `${repo}: caricamento in corso…`;
+}
+
+// La sintesi non ripete il testo integrale dell'errore: quello sta già nel
+// banner e nella sezione Avanzamento (REQ-502).
+export function testoRigaStatoIncompleto(repo) {
+  return `${repo}: dati incompleti, un aggiornamento non è riuscito`;
+}
+
 export function tabellaAvanzamento(classificazione) {
   return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
     const elementi = (classificazione[chiave] || []).map((elemento) => ({
