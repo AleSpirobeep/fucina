@@ -1,30 +1,28 @@
-Implementa T001 della spec `006-registro-leggibile`: la tavolozza Ardesia e il contrasto come test. Il colore va per primo, da solo: la struttura della pagina non cambia in questo task.
+Implementa T002 della spec `006-registro-leggibile`: la riga di stato sopra ogni sezione.
 
 ## Cosa ho fatto
 
-- In `ui/index.html`, sostituiti i sedici token di colore di entrambi i temi con i valori esatti di `contracts/palette.md`, e aggiunto il token nuovo `--colore-ok`.
-- Tolto lo sfondo ambra dal pulsante `.rispondi-form button`: era l'unico punto in cui un colore semantico faceva da sfondo a un pulsante d'azione (REQ-543). Il pulsante ora eredita lo stile d'azione di `button` (sfondo accento).
-- In `ui/lib.js`, `luminanza(colore)` e `contrasto(a, b)` secondo la formula WCAG 2.1 del contratto, e `COPPIE_CONTRASTO` con le quattordici coppie.
-- Test nuovi in `ui/contrasto.test.js`: token letti dal vero foglio di stile e confrontati col contratto (nei due sensi), le 14 coppie ≥ 4,5:1 in entrambi i temi con minimo verificato a 5,23, una controprova che un valore degradato scende sotto soglia, uso corretto di accento (solo su link e pulsanti) e dei tre semantici (mai sfondo di un pulsante d'azione), assenza di comando di tema.
-
-Questo è un secondo tentativo sulla stessa issue: un tentativo precedente aveva lo stesso contenuto ma un bug nel test che verifica il quinto criterio. La regex di scansione delle regole CSS usava `(^|\})` come gruppo di apertura senza il flag `m`: consumava la graffa di chiusura della regola precedente insieme a quella della regola corrente, e visitava una regola sì e una no — saltando `button:disabled` proprio nell'unico test che doveva coprirlo. Ho scritto la scansione con un solo pattern (`([^{}]+)\{([^{}]*)\}`) che visita tutte le regole senza saltarne, verificato aggiungendo temporaneamente `background: var(--colore-errore)` a `button:disabled` e controllando che il test diventasse rosso (poi rimosso).
-
-Ho generalizzato anche il test sull'uso dell'accento: invece di una lista scritta a mano di selettori "di stato" (fragile ai task successivi che riscrivono la struttura), il test cerca ogni regola che usa l'accento e verifica che il suo selettore sia un link o un pulsante — non serve conoscere in anticipo quali selettori esistono.
+- In `ui/lib.js`, `rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo)`: per ogni repo configurato compone stato del PM (`statoPmRepo`, già caricato da `caricaPm`), numero di agenti al lavoro (`statoAgentiAttiviRepo`, già caricato da `caricaAgentiAttivi`) e lavoro in attesa come totale (`statoAvanzamentoRepo[repo].dati.lavoro.totale`, lo stesso oggetto usato da `avvisoPmSpento` — così il totale della riga di stato e la ripartizione dell'avviso non possono contraddirsi). Nessuna chiamata nuova: la funzione legge soltanto gli stati che la pagina tiene già in memoria.
+  - Senza repo configurati restituisce `{ configurato: false, voci: [] }`.
+  - Per ogni repo manca anche uno solo dei tre dati (PM, agenti o lavoro), quel repo è marcato `completo: false` con un testo che segnala l'incompletezza, invece di trattare il dato assente come zero; gli altri repo della lista restano indipendenti — un repo che risponde non viene contaminato da uno che non risponde.
+  - Con tutti e tre i dati presenti, anche a zero, il testo li nomina esplicitamente (`testoAgentiRigaStato`, `testoLavoroRigaStato`: "nessun agente al lavoro", "niente in attesa") invece di restare vuoto.
+- In `ui/index.html`, il contenitore `#rigaStato` (nuovo blocco di stile, coerente con i token della tavolozza) inserito prima della sezione «Aspettano te» — che resta prima di «Avanzamento», che resta prima di «Agenti attivi», ordine già garantito dalla struttura esistente. `renderRigaStato()` è chiamata all'apertura della dashboard e a ogni ciclo di `aggiorna()`, dopo che `caricaPm`, `caricaAgentiAttivi` e `caricaAvanzamento` hanno aggiornato i tre stati da cui `rigaStato` legge. Senza repo configurati mostra un messaggio e un pulsante che apre la configurazione, invece di tre zeri.
+- Test nuovi in `ui/riga-stato.test.js`: nessun repo configurato, un repo del tutto a riposo (testo esplicito, non vuoto), un repo con un dato mancante (incompletezza segnalata, nessuno zero finto), due repo di cui uno risponde e uno no (i dati del primo non sono toccati da chi fallisce), pluralizzazione di `testoAgentiRigaStato`/`testoLavoroRigaStato`, e una controprova che la funzione non chiama `fetch`.
 
 ## Come l'ho verificato
 
-`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 292 test, tutti verdi (280 esistenti invariati + 12 nuovi).
+`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 303 test, tutti verdi (280 esistenti invariati + 23 nuovi).
 
-Closes #90
+Closes #91
 
 ## Decisioni
 
-Nessun ADR: la rimozione dello sfondo ambra dal pulsante e la scelta della scansione CSS generale sono applicazioni dirette dei criteri della issue, non scelte discrezionali che cambiano comportamento visibile.
+Nessun ADR: la scelta di comporre un testo unico per repo (invece di tre campi separati da assemblare nel DOM) è un dettaglio di forma della funzione pura richiesta dalla issue, non una scelta che cambia comportamento visibile o contraddice una decisione esistente.
 
 ## Non fatto
 
-Nulla: tutti i criteri di accettazione sono coperti, incluso il quinto che nel tentativo precedente aveva un buco nel test.
+Nulla: tutti i criteri di accettazione della issue sono coperti — visibilità senza scorrere (demandata al posizionamento in cima, in cima alla dashboard), repo a riposo dichiarato esplicitamente, nessun repo configurato rimandato alla configurazione, incompletezza segnalata senza somme fittizie, ordine del documento rispettato, nessuna richiesta di rete nella funzione pura.
 
 ## Fatto in più
 
-Nulla oltre ai tre file indicati dalla issue (`ui/index.html`, `ui/lib.js`, `ui/contrasto.test.js`) più questo corpo della PR.
+Nulla oltre ai tre file indicati dalla issue (`ui/lib.js`, `ui/index.html`, `ui/riga-stato.test.js`) più questo corpo della PR.

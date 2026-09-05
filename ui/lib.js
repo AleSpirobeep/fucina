@@ -554,6 +554,49 @@ export function contrasto(a, b) {
   return (chiara + 0.05) / (scura + 0.05);
 }
 
+// REQ-501, 502, 503: la riga di stato compone, per ogni repo, i tre dati che
+// la pagina ha già caricato — stato del PM (caricaPm), agenti al lavoro
+// (caricaAgentiAttivi) e lavoro in attesa (lavoroInAttesa, dentro
+// caricaAvanzamento) — senza alcuna chiamata nuova. Se una delle tre manca
+// per un repo, quel repo è marcato incompleto invece di trattare il dato
+// mancante come zero: gli altri repo della lista non ne risentono.
+export function testoAgentiRigaStato(agenti) {
+  if (agenti === 0) return "nessun agente al lavoro";
+  return agenti === 1 ? "1 agente al lavoro" : `${agenti} agenti al lavoro`;
+}
+
+export function testoLavoroRigaStato(lavoro) {
+  if (lavoro === 0) return "niente in attesa";
+  return lavoro === 1 ? "1 cosa in attesa" : `${lavoro} cose in attesa`;
+}
+
+export function rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo) {
+  const lista = repos || [];
+  if (lista.length === 0) {
+    return { configurato: false, voci: [] };
+  }
+
+  const voci = lista.map((repo) => {
+    const pmVoce = statoPmRepo[repo];
+    const agentiVoce = statoAgentiAttiviRepo[repo];
+    const avanzamentoVoce = statoAvanzamentoRepo[repo];
+
+    const pm = pmVoce && pmVoce.dati ? pmVoce.dati.stato : null;
+    const agenti = agentiVoce && agentiVoce.dati ? agentiVoce.dati.length : null;
+    const lavoro =
+      avanzamentoVoce && avanzamentoVoce.dati ? avanzamentoVoce.dati.lavoro.totale : null;
+    const completo = pm !== null && agenti !== null && lavoro !== null;
+
+    const testo = completo
+      ? `${testoStatoPm(pm)} · ${testoAgentiRigaStato(agenti)} · ${testoLavoroRigaStato(lavoro)}`
+      : "Dati incompleti: alcune informazioni non sono ancora disponibili.";
+
+    return { repo, pm, agenti, lavoro, completo, testo };
+  });
+
+  return { configurato: true, voci };
+}
+
 // Le quattordici coppie di REQ-541, in entrambi i temi (palette.md).
 export const COPPIE_CONTRASTO = [
   { etichetta: "testo su sfondo", a: "--colore-testo", b: "--colore-sfondo" },
