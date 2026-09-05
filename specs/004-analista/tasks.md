@@ -73,11 +73,39 @@ modo normale. Resta T005, a cura di Alessio.
       prima della conferma. Riportare gli esiti in una tabella di stato di verifica in
       `spec.md`.
 
+## Fase 5: il cancello e i task già fatti
+
+- [ ] T006 [US3] Il cancello smette di segnalare i task già fatti. Oggi `estraiTask` accetta
+      sia `- [ ]` sia `- [x]` ma **non cattura quale dei due**, e l'oggetto che produce espone
+      `manuale` e non `fatto`: per il cancello un task finito e uno da fare sono
+      indistinguibili. I due controlli che predicono un blocco futuro del guard —
+      `task-su-percorso-protetto` e `task-su-workflow` — girano quindi anche sui task già
+      fusi, e siccome decidono guardando se il file esiste **adesso**, ogni task fuso lascia
+      dietro di sé un rilievo permanente: il file di test che quel task ha creato ora esiste,
+      quindi «lo modificherebbe». È un avviso su un evento che non può accadere, perché un
+      task `[x]` non verrà mai più lavorato e non aprirà mai più una PR. La correzione:
+      `estraiTask` cattura la casella ed espone `fatto`; i due controlli sui percorsi saltano
+      i task `fatto`; **la copertura dei requisiti continua a contarli**, altrimenti un
+      requisito realizzato da un task fuso risulterebbe scoperto e si scambierebbe un falso
+      positivo con un altro; la consegna usa `fatto` invece di rileggere la casella per conto
+      proprio. Da correggere in `template/scripts/analista-cancello.js` e nella copia
+      installata `scripts/analista-cancello.js`, che restano identici. Test in un file nuovo
+      `template/scripts/cancello-task-fatti.test.js`: quello del cancello è protetto e non si
+      tocca. Copre REQ-321, 324.
+      Verifica: un task `- [x]` che tocca un file protetto esistente non produce alcun
+      rilievo, e lo stesso task scritto `- [ ]` lo produce; un requisito citato solo da un
+      task `- [x]` risulta ancora coperto; `node scripts/analista-cancello.js
+      specs/006-registro-leggibile` esce 0 con T001 già fuso, mentre oggi esce 1; i due file
+      del cancello sono identici (`git diff --no-index` vuoto); la suite di `.fucina.yml` è
+      verde.
+
 ## Dipendenze e ordine
 
 - T001 → T002 → T003: il cancello prima del ruolo che lo nomina; la prima parte del ruolo
   prima della seconda (stesso file).
 - T004 dopo T001, T002 e T003: deve esistere ciò che copia.
 - T005 dopo tutto.
+- T006 è indipendente e successivo: corregge il cancello di T001 dopo che l'uso reale ne ha
+  mostrato il difetto (spec 006, settembre 2026). Non dipende da T005.
 
-Ordine per il PM (una issue alla volta): **T001, T002, T003, T004**.
+Ordine per il PM (una issue alla volta): **T001, T002, T003, T004, T006**.
