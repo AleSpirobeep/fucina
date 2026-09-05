@@ -135,6 +135,16 @@
         color: var(--colore-testo-attenuato);
       }
 
+      #rigaStato {
+        font-family: var(--font-dati);
+        font-size: 0.95rem;
+        margin-top: 0.75rem;
+      }
+
+      #rigaStato p {
+        margin: 0.25rem 0;
+      }
+
       #banner {
         font-family: var(--font-dati);
         font-size: 0.85rem;
@@ -307,6 +317,7 @@
       <button id="aggiornaOra">Aggiorna</button>
       <p id="ultimoAggiornamento"></p>
       <div id="banner" role="alert" hidden></div>
+      <div id="rigaStato"></div>
 
       <section id="aspettanoTe">
         <h2>Aspettano te</h2>
@@ -354,6 +365,7 @@
         messaggioConfermaAvvia,
         lavoroInAttesa,
         avvisoPmSpento,
+        rigaStato,
       } from "./lib.js";
       import {
         issueAperte,
@@ -385,6 +397,7 @@
       const pulsanteAggiorna = document.getElementById("aggiornaOra");
       const etichettaUltimoAggiornamento = document.getElementById("ultimoAggiornamento");
       const banner = document.getElementById("banner");
+      const rigaStatoEl = document.getElementById("rigaStato");
 
       const INTERVALLO_AGGIORNAMENTO_MS = 60 * 1000;
 
@@ -478,7 +491,9 @@
           const messaggio =
             errore instanceof ErroreGitHub ? errore.message : "Errore nel fermare il PM.";
           statoPmRepo = aggiornaStatoRepo(statoPmRepo, repo, { ok: false, errore: messaggio });
-          renderAvanzamento(parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || ""));
+          const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
+          renderAvanzamento(repos);
+          renderRigaStato(repos);
         }
       }
 
@@ -502,7 +517,9 @@
                 ? errore.message
                 : "Errore nell'avviare il PM.";
           statoPmRepo = aggiornaStatoRepo(statoPmRepo, repo, { ok: false, errore: messaggio });
-          renderAvanzamento(parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || ""));
+          const repos = parseElencoRepo(localStorage.getItem(CHIAVE_REPO) || "");
+          renderAvanzamento(repos);
+          renderRigaStato(repos);
         }
       }
 
@@ -634,6 +651,38 @@
         return div;
       }
 
+      // REQ-501, 502, 503: la riga sopra ogni sezione. Senza repo configurati
+      // rimanda alla configurazione invece di tre zeri (caso limite spec 006).
+      // Finché un repo non ha ancora completato il primo giro, `rigaStato`
+      // restituisce testo null ed errore null: qui si mostra "In caricamento…",
+      // non un allarme, perché non è ancora un guasto.
+      function renderRigaStato(repos) {
+        rigaStatoEl.innerHTML = "";
+        const risultato = rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo);
+
+        if (!risultato.configurato) {
+          const p = document.createElement("p");
+          p.textContent = "Nessun repo configurato.";
+          rigaStatoEl.appendChild(p);
+          const pulsante = document.createElement("button");
+          pulsante.type = "button";
+          pulsante.textContent = "Configurazione";
+          pulsante.addEventListener("click", mostraConfigurazione);
+          rigaStatoEl.appendChild(pulsante);
+          return;
+        }
+
+        for (const riga of risultato.righe) {
+          const p = document.createElement("p");
+          p.textContent = `${riga.repo}: ${riga.testo || "In caricamento…"}`;
+          rigaStatoEl.appendChild(p);
+
+          if (riga.errore) {
+            aggiungiMessaggioErrore(rigaStatoEl, `Dati incompleti (${riga.repo}): ${riga.errore}`);
+          }
+        }
+      }
+
       function renderAvanzamento(repos) {
         tabelleAvanzamento.innerHTML = "";
         const adesso = new Date().toISOString();
@@ -698,6 +747,7 @@
         }
 
         renderAvanzamento(repos);
+        renderRigaStato(repos);
       }
 
       // REQ-401, 402: solo due letture per repo (L1, e L2 se installato) — il
@@ -724,6 +774,7 @@
         }
 
         renderAvanzamento(repos);
+        renderRigaStato(repos);
       }
 
       function costruisciSezioneAgentiAttivi(repo, agenti) {
@@ -793,6 +844,7 @@
         }
 
         renderAgentiAttivi(repos);
+        renderRigaStato(repos);
       }
 
       function costruisciFormRispondiERiavvia(issue, repo) {

@@ -454,6 +454,73 @@ export function avvisoPmSpento(stato, lavoro) {
   return lavoro;
 }
 
+function segmentoAgentiAlLavoro(numero) {
+  if (numero === 0) return "nessun agente al lavoro";
+  if (numero === 1) return "1 agente al lavoro";
+  return `${numero} agenti al lavoro`;
+}
+
+function segmentoLavoroInAttesa(numero) {
+  if (numero === 0) return "niente in attesa";
+  if (numero === 1) return "1 cosa in attesa";
+  return `${numero} cose in attesa`;
+}
+
+// Una voce di stato è affidabile solo se l'ultimo giro è andato a buon fine:
+// `nonAggiornato` copre sia il primo caricamento mai riuscito sia un dato
+// vecchio tenuto in vita da un fallimento successivo (REQ-122 spec 002,
+// non emendato dalla 006) — in entrambi i casi non è un dato fresco.
+function voceRigaStatoAffidabile(voce) {
+  return !!voce && voce.dati !== undefined && !voce.nonAggiornato;
+}
+
+// REQ-501, 502: per ogni repo, quel che si sa con certezza di PM, agenti e
+// lavoro in attesa, letto dagli stessi stati già caricati da caricaPm,
+// caricaAgentiAttivi e caricaAvanzamento — nessuna chiamata nuova. Un dato
+// non affidabile è omesso dal testo, mai sostituito da uno zero finto
+// (caso limite della spec 006: "non somma dati parziali fingendo che siano
+// totali"); gli altri repo della lista non ne risentono.
+function rigaStatoRepo(repo, pmVoce, agentiVoce, avanzamentoVoce) {
+  const pmOk = voceRigaStatoAffidabile(pmVoce);
+  const agentiOk = voceRigaStatoAffidabile(agentiVoce);
+  const lavoroOk = voceRigaStatoAffidabile(avanzamentoVoce);
+
+  const segmenti = [];
+  if (pmOk) segmenti.push(testoStatoPm(pmVoce.dati.stato));
+  if (agentiOk) segmenti.push(segmentoAgentiAlLavoro(agentiVoce.dati.length));
+  if (lavoroOk) segmenti.push(segmentoLavoroInAttesa(avanzamentoVoce.dati.lavoro.totale));
+
+  const errori = [pmVoce, agentiVoce, avanzamentoVoce]
+    .filter((voce) => voce && voce.nonAggiornato && voce.errore)
+    .map((voce) => voce.errore)
+    .filter((errore, indice, lista) => lista.indexOf(errore) === indice);
+
+  return {
+    repo,
+    completo: pmOk && agentiOk && lavoroOk,
+    testo: segmenti.length > 0 ? segmenti.join(" · ") : null,
+    errore: errori.length > 0 ? errori.join(" · ") : null,
+  };
+}
+
+// REQ-501, 502, 503: la riga sopra ogni sezione. Pura, legge solo gli stati
+// che la pagina ha già caricato — nessuna richiesta di rete. Senza repo
+// configurati non ha nulla da riportare (caso limite della spec 006: rimanda
+// alla configurazione invece di mostrare tre zeri).
+export function rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo) {
+  const lista = repos || [];
+  if (lista.length === 0) {
+    return { configurato: false };
+  }
+
+  return {
+    configurato: true,
+    righe: lista.map((repo) =>
+      rigaStatoRepo(repo, statoPmRepo[repo], statoAgentiAttiviRepo[repo], statoAvanzamentoRepo[repo]),
+    ),
+  };
+}
+
 export function tabellaAvanzamento(classificazione) {
   return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
     const elementi = (classificazione[chiave] || []).map((elemento) => ({

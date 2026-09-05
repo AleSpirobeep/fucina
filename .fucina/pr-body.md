@@ -1,30 +1,25 @@
-Implementa T001 della spec `006-registro-leggibile`: la tavolozza Ardesia e il contrasto come test. Il colore va per primo, da solo: la struttura della pagina non cambia in questo task.
+Implementa T002 della spec `006-registro-leggibile`: la riga di stato sopra ogni sezione.
 
 ## Cosa ho fatto
 
-- In `ui/index.html`, sostituiti i sedici token di colore di entrambi i temi con i valori esatti di `contracts/palette.md`, e aggiunto il token nuovo `--colore-ok`.
-- Tolto lo sfondo ambra dal pulsante `.rispondi-form button`: era l'unico punto in cui un colore semantico faceva da sfondo a un pulsante d'azione (REQ-543). Il pulsante ora eredita lo stile d'azione di `button` (sfondo accento).
-- In `ui/lib.js`, `luminanza(colore)` e `contrasto(a, b)` secondo la formula WCAG 2.1 del contratto, e `COPPIE_CONTRASTO` con le quattordici coppie.
-- Test nuovi in `ui/contrasto.test.js`: token letti dal vero foglio di stile e confrontati col contratto (nei due sensi), le 14 coppie ≥ 4,5:1 in entrambi i temi con minimo verificato a 5,23, una controprova che un valore degradato scende sotto soglia, uso corretto di accento (solo su link e pulsanti) e dei tre semantici (mai sfondo di un pulsante d'azione), assenza di comando di tema.
-
-Questo è un secondo tentativo sulla stessa issue: un tentativo precedente aveva lo stesso contenuto ma un bug nel test che verifica il quinto criterio. La regex di scansione delle regole CSS usava `(^|\})` come gruppo di apertura senza il flag `m`: consumava la graffa di chiusura della regola precedente insieme a quella della regola corrente, e visitava una regola sì e una no — saltando `button:disabled` proprio nell'unico test che doveva coprirlo. Ho scritto la scansione con un solo pattern (`([^{}]+)\{([^{}]*)\}`) che visita tutte le regole senza saltarne, verificato aggiungendo temporaneamente `background: var(--colore-errore)` a `button:disabled` e controllando che il test diventasse rosso (poi rimosso).
-
-Ho generalizzato anche il test sull'uso dell'accento: invece di una lista scritta a mano di selettori "di stato" (fragile ai task successivi che riscrivono la struttura), il test cerca ogni regola che usa l'accento e verifica che il suo selettore sia un link o un pulsante — non serve conoscere in anticipo quali selettori esistono.
+- In `ui/lib.js`, `rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo)`: per ogni repo compone stato del PM, agenti al lavoro e lavoro in attesa (totale) dai dati che la pagina ha già caricato, senza chiamate nuove. Un dato è affidabile solo se l'ultimo giro per quella voce è andato a buon fine (`!nonAggiornato`): questo copre sia un repo mai caricato con successo sia un repo che ha smesso di rispondere dopo un giro riuscito (REQ-122 della spec 002, non emendato dalla 006) — in entrambi i casi il dato vecchio o assente non viene mostrato come fresco. Con un repo parzialmente affidabile (es. solo il PM non risponde), la funzione riporta comunque i conteggi che ha (agenti e lavoro) e segnala solo la parte incompleta, invece di scartare tutto o di sommare uno zero finto. Senza repo configurati restituisce `{ configurato: false }`. Con tutti i dati presenti — anche a zero — il testo lo dice esplicitamente ("nessun agente al lavoro", "niente in attesa").
+- In `ui/index.html`, `#rigaStato` in cima alla dashboard, prima della sezione «Aspettano te» (ordine: riga di stato, «Aspettano te», «Avanzamento», «Agenti attivi»). `renderRigaStato()` si richiama ovunque cambino i dati da cui dipende — a fine `caricaPm()`, `caricaAvanzamento()`, `caricaAgentiAttivi()`, e nei rami d'errore di `gestisciFermaPm`/`gestisciAvviaPm` — così la riga non resta indietro rispetto ai comandi del PM. Prima che un repo completi il proprio primo giro, `rigaStato` restituisce testo ed errore nulli: la pagina mostra "In caricamento…", non un allarme, perché non è ancora un guasto. Senza repo configurati mostra un rimando alla configurazione invece di tre zeri.
+- Test nuovi in `ui/riga-stato.test.js`: nessun repo configurato, repo del tutto a riposo, pluralizzazioni, PM non installato, repo mai caricato, un repo che smette di rispondere dopo un giro riuscito (costruito con `aggiornaStatoRepo` reale, non con dati letterali), un repo che risponde e uno no (i conteggi del primo non spariscono, solo il secondo è segnalato incompleto), un repo affidabile solo in parte (mostra ciò che ha), nessuna chiamata `fetch`.
 
 ## Come l'ho verificato
 
-`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 292 test, tutti verdi (280 esistenti invariati + 12 nuovi).
+`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 303 test verdi (292 esistenti invariati + 11 nuovi).
 
-Closes #90
+Closes #91
 
 ## Decisioni
 
-Nessun ADR: la rimozione dello sfondo ambra dal pulsante e la scelta della scansione CSS generale sono applicazioni dirette dei criteri della issue, non scelte discrezionali che cambiano comportamento visibile.
+Nessun ADR: trattare `nonAggiornato` come dato non affidabile è la lettura diretta di REQ-122 (spec 002, non emendato dalla 006); mostrare i conteggi disponibili di un repo parzialmente affidabile invece di scartarli tutti è la lettura diretta del caso limite della spec 006 ("riporta i conteggi che ha... non somma dati parziali fingendo che siano totali"). Nessuna delle due è una scelta discrezionale che introduce comportamento nuovo.
 
 ## Non fatto
 
-Nulla: tutti i criteri di accettazione sono coperti, incluso il quinto che nel tentativo precedente aveva un buco nel test.
+Nulla: tutti i criteri di accettazione della issue sono coperti.
 
 ## Fatto in più
 
-Nulla oltre ai tre file indicati dalla issue (`ui/index.html`, `ui/lib.js`, `ui/contrasto.test.js`) più questo corpo della PR.
+Nulla oltre ai tre file indicati dalla issue (`ui/lib.js`, `ui/index.html`, `ui/riga-stato.test.js`) più questo corpo della PR.
