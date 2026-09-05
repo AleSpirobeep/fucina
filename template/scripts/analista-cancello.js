@@ -37,7 +37,7 @@ const PERCORSO_WORKFLOW = ".github/workflows/";
 const LABEL_TEST = "allow-test-changes";
 
 const REQ_RE = /^\s*-\s*\*\*(REQ-\d{3})\*\*/;
-const TASK_RE = /^\s*-\s*\[[ xX]\]\s*(T\d{3}[a-z]?)\b/;
+const TASK_RE = /^\s*-\s*\[([ xX])\]\s*(T\d{3}[a-z]?)\b/;
 const TITOLO_RE = /^(#{1,6})\s+(.*)$/;
 const VERIFICA_RE = /verifica\s*:?\s*\*?\s*\S/i;
 const CATENA_REQ_RE = /REQ-(\d{3})((?:\s*(?:\([^)]*\))?\s*,\s*\d{3})*)/g;
@@ -142,7 +142,8 @@ function percorsiCitati(testo) {
 }
 
 // Un task è "- [ ] TNNN ...": la riga più quelle rientrate che la seguono. È manuale se
-// lo dice con [MANUALE] o se sta sotto una fase dichiarata a cura di Alessio.
+// lo dice con [MANUALE] o se sta sotto una fase dichiarata a cura di Alessio. È fatto se
+// la sua casella è già spuntata «[x]»: quel task non riceverà mai più una PR.
 function estraiTask(testoTasks) {
   const elenco = [];
   let corrente = null;
@@ -156,7 +157,13 @@ function estraiTask(testoTasks) {
     }
     const inizio = TASK_RE.exec(riga);
     if (inizio) {
-      corrente = { id: inizio[1], riga: indice + 1, titolo, blocco: [riga] };
+      corrente = {
+        id: inizio[2],
+        riga: indice + 1,
+        titolo,
+        blocco: [riga],
+        fatto: /[xX]/.test(inizio[1]),
+      };
       elenco.push(corrente);
       return;
     }
@@ -179,6 +186,7 @@ function estraiTask(testoTasks) {
       id: task.id,
       riga: task.riga,
       manuale,
+      fatto: task.fatto,
       requisiti: requisitiCitati(testo),
       percorsi: percorsiCitati(testo),
       haVerifica: VERIFICA_RE.test(testo),
@@ -347,6 +355,9 @@ function verifica({ documenti = {}, configurazione = {}, fileEsistenti = [] } = 
         );
       }
     }
+    // I due controlli seguenti predicono un blocco del guard su una PR futura: un task
+    // già fatto non ne aprirà mai più una, quindi non li riguardano.
+    if (voce.fatto) continue;
     for (const percorso of voce.percorsi) {
       if (percorso.startsWith(PERCORSO_WORKFLOW)) {
         aggiungi(
