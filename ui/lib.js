@@ -494,6 +494,29 @@ export function rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanza
   return { configurato: true, righe };
 }
 
+// Issue #104 (T002b), REQ-501/502 — i tre stati della riga per un singolo repo, distinti per
+// nome invece di essere confusi in un solo ramo (T002 si è arenata tre volte su questo):
+// «caricamento» finché una delle tre fonti non ha mai completato un giro; «incompleto» se
+// almeno una fonte ha fallito il suo giro più recente — un dato marcato `nonAggiornato` non è
+// mai trattato come fresco, anche se resta da un giro precedente riuscito; «riuscito» solo
+// quando tutte e tre sono fresche. Non fa richieste di rete: legge solo le voci già in memoria.
+export function situazioneRigaStato(pmVoce, agentiVoce, avanzamentoVoce) {
+  const voci = [pmVoce, agentiVoce, avanzamentoVoce];
+  if (voci.some((voce) => !voce)) return "caricamento";
+  if (voci.some((voce) => voce.nonAggiornato || !voce.dati)) return "incompleto";
+  return "riuscito";
+}
+
+export function testoRigaStatoCaricamento(repo) {
+  return `${repo}: caricamento…`;
+}
+
+// La riga è una sintesi (issue #104): il testo integrale dell'errore sta già nel banner e
+// nella sezione Avanzamento, qui compare solo l'indicazione che il repo è incompleto.
+export function testoRigaStatoIncompleto(repo) {
+  return `${repo}: dati incompleti`;
+}
+
 export function tabellaAvanzamento(classificazione) {
   return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
     const elementi = (classificazione[chiave] || []).map((elemento) => ({

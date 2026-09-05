@@ -1,25 +1,26 @@
-Implementa T002a della spec `006-registro-leggibile`: la riga di stato sopra ogni sezione, per il solo caso in cui il caricamento è riuscito. I tre stati (non ancora caricato, un repo non risponde, tutto a posto) sono T002b — questa issue nasce dalla divisione di T002 (#91) proprio per tenerli separati.
+Implementa T002b della spec `006-registro-leggibile`: i tre stati della riga di stato.
 
 ## Cosa ho fatto
 
-- In `ui/lib.js`, `rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo)`: per ogni repo compone stato del PM, agenti al lavoro e lavoro in attesa (totale) dai dati che la pagina ha già caricato — nessuna chiamata nuova. Include un repo solo se tutte e tre le voci hanno concluso con successo il proprio giro; un repo il cui giro non è ancora completo resta fuori dalle righe (comportamento provvisorio: la distinzione esplicita fra "in caricamento" ed "errore" è T002b). Senza repo configurati restituisce `{ configurato: false }`. Due funzioni di testo di supporto, `testoAgentiAlLavoro(numero)` e `testoLavoroInAttesa(numero)`, dicono esplicitamente "nessun agente al lavoro" e "niente in attesa" quando il conteggio è zero, così un repo del tutto a riposo non resta muto. `messaggioNessunRepoConfigurato()` rimanda alla configurazione invece di mostrare tre zeri.
-- In `ui/index.html`, la sezione `#rigaStato` in cima alla dashboard, prima di «Aspettano te» (ordine nel documento: riga di stato, «Aspettano te», «Avanzamento», «Agenti attivi», verificato con REQ-503). `renderRigaStato()` viene richiamata a fine di ciascuno dei tre caricamenti da cui dipende — `caricaAvanzamento`, `caricaPm`, `caricaAgentiAttivi` — così la riga si aggiorna via via che i dati arrivano, senza attendere che tutti i repo abbiano finito.
-- Test nuovi in `ui/riga-stato.test.js`: nessun repo configurato, repo configurato ma dati non ancora arrivati, repo del tutto a riposo (testo esplicito su tutti e tre i fronti), repo con agenti e lavoro in attesa (pluralizzazione inclusa), due repo di cui uno solo caricato, nessuna chiamata `fetch`.
+- In `ui/lib.js`, `situazioneRigaStato(pmVoce, agentiVoce, avanzamentoVoce)`: dato lo stato per repo delle tre fonti da cui dipende la riga (PM, agenti attivi, avanzamento), dice in quale delle tre situazioni si trova quel repo — `"caricamento"` finché anche una sola delle tre fonti non ha mai completato un giro (voce `undefined`), `"incompleto"` se almeno una fonte ha fallito il proprio giro più recente (`nonAggiornato` o nessun dato), `"riuscito"` solo quando tutte e tre sono fresche. Un dato marcato `nonAggiornato` non è mai trattato come fresco anche se resta in memoria da un giro precedente riuscito (REQ-122, spec 002): la funzione non lo confonde con `"riuscito"`. Due funzioni di testo, `testoRigaStatoCaricamento(repo)` e `testoRigaStatoIncompleto(repo)`, producono la sintesi da mostrare — la seconda nomina solo il repo, senza ripetere il testo integrale dell'errore, che sta già nel banner e nella sezione Avanzamento. Nessuna delle tre chiama `fetch`: leggono solo le voci già in memoria.
+- In `ui/index.html`, `renderRigaStato()` ora produce sempre una riga per ciascun repo configurato, mai un vuoto in mezzo agli altri: per ognuno calcola la situazione con `situazioneRigaStato` e sceglie il testo di conseguenza — i conteggi di `rigaStato` (invariata, T002a) per `"riuscito"`, `testoRigaStatoIncompleto` con `role="alert"` per `"incompleto"`, `testoRigaStatoCaricamento` senza `role="alert"` per `"caricamento"`. Il colore d'errore in questa pagina è legato esclusivamente a `[role="alert"]` nel foglio di stile: non impostarlo per lo stato di caricamento è già sufficiente a rispettare "tono neutro, senza il colore d'errore" senza bisogno di una classe nuova.
+- `rigaStato` (T002a) non è toccata: resta la sola fonte dei tre testi per il caso riuscito, e i suoi test esistenti restano validi così come sono.
+- Test nuovi in `ui/stati-riga-stato.test.js`: nessuna fonte completata, una sola fonte mancante, tutte e tre riuscite, una fonte mai riuscita, una fonte che ha smesso di rispondere dopo un giro riuscito (costruita con `aggiornaStatoRepo` reale, verificando che il dato vecchio resti in memoria ma non sia mai letto come `"riuscito"`), i testi di caricamento e di incompletezza (quest'ultimo verificato per non contenere il testo dell'errore originale), nessuna chiamata `fetch`.
 
 ## Come l'ho verificato
 
-`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 304 test verdi (292 esistenti invariati + 12 nuovi).
+`node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` — 312 test verdi (301 esistenti invariati + 11 nuovi).
 
-Closes #103
+Closes #104
 
 ## Decisioni
 
-Nessun ADR: l'unica scelta non scritta esplicitamente nella issue è cosa fare di un repo il cui giro non è ancora concluso (ometterlo dalle righe finché non lo è). Non è una scelta discrezionale che introduce comportamento visibile nuovo: la issue stessa dichiara che gli stati di caricamento ed errore sono T002b, quindi qualunque resa provvisoria di quel caso è dentro il perimetro che T002b sostituirà.
+Nessun ADR: la scelta di rappresentare i tre stati a livello di intero repo (non per singola fonte, cioè PM/agenti/avanzamento) segue alla lettera i criteri di accettazione della issue e il caso limite della spec 006 ("un repo risponde e un altro no"), che parlano sempre di un repo nel suo complesso. È anche la lezione delle tre revisioni precedenti di T002 (#91): un tentativo che mescolava affidabilità per singola fonte dentro un solo repo è quello per cui la issue #104 dice esplicitamente "ora sono nominati" i tre stati, in numero fisso. Riusare il colore d'errore già legato a `[role="alert"]` invece di introdurre una classe CSS nuova non è una scelta discrezionale: è l'unico modo già esistente nella pagina per marcare/non marcare un testo come errore.
 
 ## Non fatto
 
-La distinzione esplicita fra "non ancora caricato" e "un repo non risponde" — è T002b per dichiarazione esplicita della issue, non un buco di questa PR.
+Nulla: tutti i criteri di accettazione della issue sono coperti.
 
 ## Fatto in più
 
-Nulla oltre ai tre file indicati dalla issue (`ui/lib.js`, `ui/index.html`, `ui/riga-stato.test.js`) più questo corpo della PR.
+Nulla oltre ai tre file indicati dalla issue (`ui/lib.js`, `ui/index.html`, `ui/stati-riga-stato.test.js`) più questo corpo della PR.
