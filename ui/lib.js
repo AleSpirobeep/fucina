@@ -531,3 +531,40 @@ export function terminaAggiornamento(stato, adesso, haErrori) {
     ultimoAggiornamento: haErrori ? stato.ultimoAggiornamento : adesso,
   };
 }
+
+// Luminanza relativa e rapporto di contrasto secondo WCAG 2.1, come definiti
+// nel contratto `specs/006-registro-leggibile/contracts/palette.md`.
+export function luminanza(colore) {
+  const esadecimale = colore.replace("#", "");
+  const canali = [0, 2, 4].map((i) => parseInt(esadecimale.slice(i, i + 2), 16) / 255);
+  const linearizza = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = canali.map(linearizza);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function contrasto(a, b) {
+  const luminanzaA = luminanza(a);
+  const luminanzaB = luminanza(b);
+  const chiara = Math.max(luminanzaA, luminanzaB);
+  const scura = Math.min(luminanzaA, luminanzaB);
+  return (chiara + 0.05) / (scura + 0.05);
+}
+
+// Le quattordici coppie testo/sfondo del contratto (tavolozza Ardesia),
+// come nomi di token senza il prefisso `--`, da verificare in entrambi i temi.
+export const COPPIE_CONTRASTO = [
+  ["colore-testo", "colore-sfondo"],
+  ["colore-testo", "colore-sfondo-rialzato"],
+  ["colore-testo-attenuato", "colore-sfondo"],
+  ["colore-testo-attenuato", "colore-sfondo-rialzato"],
+  ["colore-accento", "colore-sfondo"],
+  ["colore-accento-scuro", "colore-sfondo"],
+  ["colore-accento-testo", "colore-accento"],
+  ["colore-ambra", "colore-sfondo"],
+  ["colore-ambra-testo", "colore-ambra-sfondo"],
+  ["colore-ambra-bottone-testo", "colore-ambra"],
+  ["colore-errore", "colore-sfondo"],
+  ["colore-testo", "colore-errore-sfondo"],
+  ["colore-ok", "colore-sfondo"],
+  ["colore-ok", "colore-sfondo-rialzato"],
+];
