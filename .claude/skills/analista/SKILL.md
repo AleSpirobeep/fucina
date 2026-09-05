@@ -172,8 +172,9 @@ Si invoca **dopo** che la PR della spec è stata fusa. Prima di fare qualsiasi c
 3. controlla le issue già esistenti: la consegna è **idempotente**, un task che ha già una
    issue (aperta o chiusa) non ne riceve una seconda.
 
-Poi, per ogni task non manuale **e non ancora spuntato** (`- [ ]`: un task `- [x]` è già
-fatto e non riceve una issue), in ordine di identificativo, crea una issue con:
+Poi, per ogni task non manuale con `fatto: false` (il campo che `estraiTask` di
+`scripts/analista-cancello.js` ricava dalla casella — un task `fatto` è già stato fuso e non
+riceve una issue), in ordine di identificativo, crea una issue con:
 
 - titolo `T<NNN>: <titolo del task>` — è così che il PM la trova e la ordina;
 - label `in-coda`, e **nessun'altra**;
