@@ -1,60 +1,58 @@
-Il cancello dell'analista non segnala più i task già fusi (issue #107, T006 di
-`specs/004-analista`).
+T006 (`specs/006-registro-leggibile`): il Registro è usabile da 360 px in su, con un'unica
+serie di regole CSS valida a ogni larghezza — nessuna "versione telefono" separata da
+mantenere.
 
-`estraiTask` cattura ora la casella del task (`- [ ]` o `- [x]`) ed espone `fatto` accanto a
-`manuale`. I due controlli che predicono un blocco futuro del guard —
-`task-su-percorso-protetto` e `task-su-workflow` — saltano i task `fatto`: la PR che
-predicono non esisterà mai più, perché il task è già stato fuso. La copertura dei requisiti
-(`requisito-non-coperto`) resta invariata e continua a contare anche i task `fatto`, come
-richiesto dal punto 3 della issue — era la trappola: escluderli avrebbe scambiato un falso
-positivo con un altro.
+In `ui/index.html`:
 
-Il punto 4 della correzione — la consegna deve leggere `fatto` invece di rileggere la
-casella per conto proprio — è realizzato in `plugin/skills/analista/SKILL.md`, sezione «La
-consegna — `/analista consegna`»: la condizione ora rimanda esplicitamente al campo `fatto`
-prodotto da `estraiTask` in `scripts/analista-cancello.js`, invece di ridecidere da sé cosa
-significhi la casella.
+- Aggiunto `<meta name="viewport" content="width=device-width, initial-scale=1" />` in
+  `<head>`. Senza questo meta i browser dei telefoni impaginano su un viewport virtuale di
+  ~980 px e poi rimpiccioliscono tutto: nessuna delle regole sotto avrebbe effetto reale su
+  un telefono, solo restringendo la finestra di un browser desktop (dove il meta non serve,
+  perché lì il viewport coincide già con la finestra).
+- Tolta la `min-width: 1200px` dal `body` — causa diretta dello scorrimento orizzontale su
+  schermi stretti.
+- `.griglia-secondaria` (Avanzamento + Agenti attivi) collassa a una colonna sotto i 700 px
+  con una media query.
+- `button`, inclusi «Ferma» e «Avvia», hanno `min-height`/`min-width: 44px`.
+- `input`/`textarea` prendono `width: 100%; max-width: 30rem`, così il campo repo
+  (`cols="40"`) non sfora più a schermi stretti.
+- I conteggi (`.conteggi-avanzamento`) avevano già `flex-wrap: wrap`: coperto da REQ-532
+  senza bisogno di altro codice, solo di un test che lo verifichi.
+- Un nome di repo lungo va già a capo grazie a `overflow-wrap: anywhere` ereditato dal
+  `body`, mai spento da regole più specifiche: verificato, non serviva altro codice.
 
-`template/scripts/analista-cancello.js` e `scripts/analista-cancello.js` restano identici
-(`git diff --no-index` vuoto). Nuovo file `template/scripts/cancello-task-fatti.test.js` con
-6 test; il file protetto `analista-cancello.test.js` non è stato toccato.
+Nessuna funzione di `ui/lib.js` toccata: il task è quasi interamente foglio di stile
+(REQ-552 rispettato).
 
-Suite completa: `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` → **347/347
-verdi**.
+Nuovo file `ui/telefono.test.js` (8 test) che legge il vero `<style>`/`<head>` di
+`index.html`, sullo stesso schema di `contrasto.test.js`: meta viewport presente e con
+`width=device-width`, nessuna `min-width` fissa su `body`, nessuna regola del foglio con
+`min-width` oltre 44px, area toccabile dei pulsanti, soglia e presenza della media query
+sulla griglia, `flex-wrap: wrap` sui conteggi, larghezza dei campi, ereditarietà di
+`overflow-wrap`.
 
-Closes #107
+Suite completa: `node --test "ui/**/*.test.js" "template/scripts/**/*.test.js"` →
+**355/355 verdi** (347 preesistenti invariati + 8 nuovi).
 
-## Decisioni
-
-Nessun ADR aggiunto da questo tentativo: la correzione segue i quattro punti della issue, e
-lo scope dei due `SKILL.md` per il punto 4 è già deciso dall'ADR del PM
-`docs/decisions/2026-09-05-0944-consegna-legge-fatto-dai-due-skill-md.md`.
+Closes #95
 
 ## Non fatto
 
-**`.claude/skills/analista/SKILL.md` non è stato aggiornato.** L'ADR del PM richiede che
-`plugin/skills/analista/SKILL.md` e la sua copia installata `.claude/skills/analista/SKILL.md`
-restino identici, come i due `analista-cancello.js`. Ho applicato la stessa modifica a
-entrambi, ma ogni scrittura su `.claude/skills/analista/SKILL.md` (con `Edit`, `Write` e
-anche `Bash` — `cp`, redirezione, `python3`) è stata respinta dal sistema di permessi con
-«Claude requested permissions to write to .../.claude/skills/analista/SKILL.md, but you
-haven't granted it yet», indipendentemente dallo strumento usato. `.claude/` non compare fra
-i `percorsi_protetti` di `.fucina.yml` né in una lista di eccezioni nota: sembra una
-protezione dell'ambiente sui file che il runner stesso carica come proprie skill, distinta
-dai permessi di `.fucina.yml`. Serve un intervento umano (aggiornare `--allowedTools`
-dell'agente sviluppatore per consentire la scrittura sotto `.claude/`, o sincronizzare quel
-file a mano) prima che i due `SKILL.md` possano tornare identici.
-
-Il criterio «`node scripts/analista-cancello.js specs/006-registro-leggibile` esce 0» resta
-non verificabile alla lettera, per il motivo già segnalato nel tentativo precedente e
-confermato dal PM: oggi dà 5 rilievi `task-su-percorso-protetto`, uno per ciascuno di
-T002a, T002b, T003, T004, T005 — task fusi le cui caselle in
-`specs/006-registro-leggibile/tasks.md` non sono mai state spuntate. È un `tasks.md` non
-aggiornato, non un difetto del cancello: `specs/**` è protetto e non è fra i file da toccare
-di questa issue. Il difetto specifico descritto (T001, casella `[x]`) è verificato: quel
-rilievo non compare più.
+La verifica visiva in un vero browser ridimensionato a 360×740 (assenza reale di
+scorrimento orizzontale, leggibilità del testo). L'ambiente dell'agente non ha un browser
+da pilotare, e per dichiarazione esplicita del piano della spec 006 (sezione «Rischi») è
+una verifica di Alessio, non della suite — la CI non può restringere una finestra.
 
 ## Fatto in più
 
-`plugin/skills/analista/SKILL.md` — dichiarato dall'ADR del PM come in scope per il punto 4,
-pur non comparendo nella sezione «File da toccare» della issue.
+Il meta viewport (`<meta name="viewport" ...>`) e il suo test: non nominato esplicitamente
+nella issue, ma senza di esso nessuna regola CSS di questo task si applicherebbe su un vero
+telefono (il dispositivo dello scenario 3 della spec), solo restringendo una finestra
+desktop — dove il difetto non si vedrebbe. È lo stesso criterio di accettazione
+(«raggiungibili e toccabili», «nessuna sezione provoca scorrimento orizzontale») applicato
+al dispositivo reale invece che alla sua unica approssimazione controllabile dalla CI.
+
+Fix di `input`/`textarea` (`width: 100%; max-width: 30rem`) — non nominato esplicitamente
+nella issue, ma necessario perché il campo repo della configurazione non sforasse lo
+schermo a 360 px, violando lo stesso criterio di accettazione sullo scorrimento
+orizzontale.
