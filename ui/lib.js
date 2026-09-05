@@ -454,6 +454,46 @@ export function avvisoPmSpento(stato, lavoro) {
   return lavoro;
 }
 
+export function testoAgentiAlLavoro(numero) {
+  if (numero === 0) return "nessun agente al lavoro";
+  return numero === 1 ? "1 agente al lavoro" : `${numero} agenti al lavoro`;
+}
+
+export function testoLavoroInAttesa(numero) {
+  return numero === 0 ? "niente in attesa" : `${numero} in attesa`;
+}
+
+export function messaggioNessunRepoConfigurato() {
+  return "Nessun repo configurato. Aggiungilo in Configurazione.";
+}
+
+// specs/006-registro-leggibile/spec.md — REQ-501, 502, 503: la riga di stato, sopra ogni
+// sezione, per il solo caso in cui il caricamento è riuscito (gli stati di caricamento ed
+// errore sono T002b). Compone dati che la pagina ha già caricato, nessuna chiamata nuova:
+// un repo il cui giro non è ancora completo per tutte e tre le voci resta fuori da `righe`,
+// finché non lo è.
+export function rigaStato(repos, statoPmRepo, statoAgentiAttiviRepo, statoAvanzamentoRepo) {
+  const elencoRepo = repos || [];
+  if (elencoRepo.length === 0) return { configurato: false, righe: [] };
+
+  const righe = [];
+  for (const repo of elencoRepo) {
+    const pm = statoPmRepo[repo];
+    const agenti = statoAgentiAttiviRepo[repo];
+    const avanzamento = statoAvanzamentoRepo[repo];
+    if (!pm?.dati || !agenti?.dati || !avanzamento?.dati) continue;
+
+    righe.push({
+      repo,
+      testoStato: testoStatoPm(pm.dati.stato),
+      testoAgenti: testoAgentiAlLavoro(agenti.dati.length),
+      testoLavoro: testoLavoroInAttesa(avanzamento.dati.lavoro.totale),
+    });
+  }
+
+  return { configurato: true, righe };
+}
+
 export function tabellaAvanzamento(classificazione) {
   return COLONNE_AVANZAMENTO.map(({ chiave, etichetta }) => {
     const elementi = (classificazione[chiave] || []).map((elemento) => ({
