@@ -58,7 +58,6 @@
       }
 
       body {
-        min-width: 1200px;
         max-width: 1400px;
         margin: 0 auto;
         padding: 1.5rem 2rem 3rem;
@@ -109,6 +108,8 @@
         border: 1px solid var(--colore-accento-scuro);
         border-radius: 0.3rem;
         padding: 0.4rem 0.9rem;
+        min-height: 44px;
+        min-width: 44px;
         cursor: pointer;
       }
 
@@ -234,6 +235,15 @@
         margin-bottom: 0;
       }
 
+      /* REQ-530, 531, 532: da 360 px in su, una sola serie di regole. Sotto i
+         700 px la griglia a due colonne si riduce a una, senza una pagina a
+         parte da mantenere. */
+      @media (max-width: 700px) {
+        .griglia-secondaria {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
       .conteggi-avanzamento {
         display: flex;
         flex-wrap: wrap;
@@ -282,6 +292,8 @@
         border: 1px solid var(--colore-bordo);
         border-radius: 0.3rem;
         padding: 0.4rem;
+        width: 100%;
+        max-width: 30rem;
       }
 
       [role="alert"] {
