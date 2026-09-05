@@ -531,3 +531,47 @@ export function terminaAggiornamento(stato, adesso, haErrori) {
     ultimoAggiornamento: haErrori ? stato.ultimoAggiornamento : adesso,
   };
 }
+
+// Luminanza relativa e rapporto di contrasto secondo WCAG 2.1, formula del
+// contratto in specs/006-registro-leggibile/contracts/palette.md.
+export function luminanza(colore) {
+  const esadecimale = colore.replace("#", "");
+  const canale = (valore) => {
+    const c = parseInt(valore, 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const r = canale(esadecimale.slice(0, 2));
+  const g = canale(esadecimale.slice(2, 4));
+  const b = canale(esadecimale.slice(4, 6));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function contrasto(a, b) {
+  const luminanzaA = luminanza(a);
+  const luminanzaB = luminanza(b);
+  const chiara = Math.max(luminanzaA, luminanzaB);
+  const scura = Math.min(luminanzaA, luminanzaB);
+  return (chiara + 0.05) / (scura + 0.05);
+}
+
+// Le quattordici coppie di REQ-541, in entrambi i temi (palette.md).
+export const COPPIE_CONTRASTO = [
+  { etichetta: "testo su sfondo", a: "--colore-testo", b: "--colore-sfondo" },
+  { etichetta: "testo su sfondo-rialzato", a: "--colore-testo", b: "--colore-sfondo-rialzato" },
+  { etichetta: "testo-attenuato su sfondo", a: "--colore-testo-attenuato", b: "--colore-sfondo" },
+  {
+    etichetta: "testo-attenuato su sfondo-rialzato",
+    a: "--colore-testo-attenuato",
+    b: "--colore-sfondo-rialzato",
+  },
+  { etichetta: "accento su sfondo", a: "--colore-accento", b: "--colore-sfondo" },
+  { etichetta: "accento-scuro su sfondo", a: "--colore-accento-scuro", b: "--colore-sfondo" },
+  { etichetta: "accento-testo su accento", a: "--colore-accento-testo", b: "--colore-accento" },
+  { etichetta: "ambra su sfondo", a: "--colore-ambra", b: "--colore-sfondo" },
+  { etichetta: "ambra-testo su ambra-sfondo", a: "--colore-ambra-testo", b: "--colore-ambra-sfondo" },
+  { etichetta: "ambra-bottone-testo su ambra", a: "--colore-ambra-bottone-testo", b: "--colore-ambra" },
+  { etichetta: "errore su sfondo", a: "--colore-errore", b: "--colore-sfondo" },
+  { etichetta: "testo su errore-sfondo", a: "--colore-testo", b: "--colore-errore-sfondo" },
+  { etichetta: "ok su sfondo", a: "--colore-ok", b: "--colore-sfondo" },
+  { etichetta: "ok su sfondo-rialzato", a: "--colore-ok", b: "--colore-sfondo-rialzato" },
+];
