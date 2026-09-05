@@ -12,6 +12,14 @@ riorganizzazione rompe un comportamento, lo dice la CI prima del PM.
 **Organizzazione**: un task = una issue = una PR, lavorata dall'agente sviluppatore e
 revisionata dal PM. Ordine sequenziale.
 
+**Stato** (5/9/2026): T001 fuso (PR #98), tavolozza Ardesia in produzione.
+
+**T002 è stato diviso in T002a e T002b** dopo che l'agente ne aveva esaurito i tre tentativi
+(PR #99, #100, #101). Le tre revisioni giravano tutte attorno allo stesso punto: il criterio
+«con un repo che risponde e uno che no, la riga segnala l'incompletezza e non somma dati
+parziali» nascondeva tre stati diversi — non ancora caricato, un repo non risponde, tutto a
+posto — senza mai nominarli. Ora sono nominati, e stanno in un task loro.
+
 ## Formato: `[ID] [Scenario] Descrizione`
 
 - **[US1..US4]**: scenario d'uso della spec (1 dieci secondi, 2 l'avanzamento non è più un
@@ -19,7 +27,7 @@ revisionata dal PM. Ordine sequenziale.
 
 ## Fase 1: il colore
 
-- [ ] T001 [US4] La tavolozza Ardesia e il contrasto come test. In `ui/index.html` sostituire
+- [x] T001 [US4] La tavolozza Ardesia e il contrasto come test. In `ui/index.html` sostituire
       i valori dei token di colore nei due temi con quelli del contratto, e aggiungere il
       token nuovo `--colore-ok`; in `ui/lib.js` le funzioni pure `luminanza(colore)` e
       `contrasto(a, b)` secondo la formula del contratto, e la tabella delle coppie da
@@ -35,19 +43,34 @@ revisionata dal PM. Ordine sequenziale.
 
 ## Fase 2: la gerarchia
 
-- [ ] T002 [US1] La riga di stato sopra ogni sezione. In `ui/lib.js` la funzione pura che
-      compone, per ogni repo, stato del PM, agenti al lavoro e lavoro in attesa **dai dati che
-      la pagina ha già** — nessuna chiamata nuova; in `ui/index.html` la riga in cima, prima
-      di «Aspettano te», e le tre sezioni nell'ordine «Aspettano te», «Avanzamento», «Agenti
-      attivi». Test in `ui/riga-stato.test.js`.
+- [ ] T002a [US1] La riga di stato sopra ogni sezione, quando i dati ci sono. In `ui/lib.js`
+      la funzione pura che compone, per ogni repo, stato del PM, agenti al lavoro e lavoro in
+      attesa **dai dati che la pagina ha già** — nessuna chiamata nuova; in `ui/index.html` la
+      riga in cima, prima di «Aspettano te», e le tre sezioni nell'ordine «Aspettano te»,
+      «Avanzamento», «Agenti attivi». Solo il caso in cui il caricamento è riuscito: gli stati
+      di caricamento ed errore sono T002b. Test in `ui/riga-stato.test.js`.
       Copre REQ-501, 502, 503.
-      Verifica: in una finestra da 1280×800, a pagina appena caricata, stato del PM, agenti e
+      Verifica: in una finestra da 1280×800, con i dati caricati, stato del PM, agenti e
       lavoro in attesa sono visibili senza scorrere; con un repo del tutto a riposo la riga lo
       dice esplicitamente invece di restare vuota; senza repo configurati rimanda alla
-      configurazione invece di mostrare tre zeri; con un repo che risponde e uno che no, la
-      riga segnala l'incompletezza e non somma dati parziali; l'ordine nel documento è riga di
-      stato, «Aspettano te», «Avanzamento», «Agenti attivi»; la funzione non fa richieste di
-      rete.
+      configurazione invece di mostrare tre zeri; l'ordine nel documento è riga di stato,
+      «Aspettano te», «Avanzamento», «Agenti attivi»; la funzione non fa richieste di rete.
+
+- [ ] T002b [US1] I tre stati della riga di stato. La riga deve distinguere **tre** situazioni,
+      e ciascuna ha il proprio testo: *non ancora caricato* (il primo giro non è finito),
+      *caricato ma un repo non risponde*, *caricato correttamente*. Confonderle è ciò su cui
+      T002 si è arenata tre volte. In `ui/lib.js` la funzione pura che, dato lo stato per repo,
+      dice in quale delle tre situazioni si trova ciascuno; in `ui/index.html` la resa
+      corrispondente. Test in `ui/stati-riga-stato.test.js`.
+      Copre REQ-501, 502.
+      Verifica: prima che il primo giro sia finito la riga dice che sta caricando, con tono
+      neutro e **senza** il colore d'errore e senza `role="alert"`; un repo che non risponde è
+      segnalato come incompleto **mentre i conteggi dei repo che rispondono restano visibili**;
+      i dati di un repo che ha smesso di rispondere non vengono mai presentati come aggiornati,
+      e non si sommano dati parziali di repo diversi; a caricamento riuscito nessun avviso
+      compare; l'indicazione di incompletezza nella riga non ripete il testo integrale
+      dell'errore, che sta già nel banner e nella sezione Avanzamento — la riga è una sintesi;
+      la funzione non fa richieste di rete.
 
 ## Fase 3: la densità
 
